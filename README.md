@@ -1,5 +1,5 @@
 2025 Senior Design Capstone; Team 10: The Convoy
-- Sponsored by The Charles Stark Draper Laboratory
+Sponsored by The Charles Stark Draper Laboratory
 
 
 A robotic convoy that seamlessly collaborates as one unit, though segmented into individual actors, each communicating effectively to survey their environment with high degrees of accuracy.
