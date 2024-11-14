@@ -3,15 +3,14 @@
 #include <geometry_msgs/msg/twist_stamped.hpp>
 #include <termios.h>
 #include <unistd.h>
-#include <thread>
-#include <iostream>
 #include <map>
-#include <string>
+#include <tuple>
+#include <iostream>
 
 // Message for usage
 const char *msg = R"(
-Hello, this is my custom C++ teleop controller. This node takes keypresses from the keyboard and publishes them
-as Twist/TwistStamped messages. It works best with a US keyboard layout.
+Hello, this is my custom C++ teleop controller.
+Use the following keys to control the robot:
 ---------------------------
 Moving around:
    u    i    o
@@ -27,16 +26,16 @@ e/c : increase/decrease only angular speed by 10%
 CTRL-C to quit
 )";
 
-std::map<char, std::tuple<float, float, float, float>> moveBindings{
-    {'i', {1, 0, 0, 0}}, {'o', {1, 0, 0, -1}}, {'j', {0, 0, 0, 1}}, {'l', {0, 0, 0, -1}}, {'u', {1, 0, 0, 1}}, {',', {-1, 0, 0, 0}}, {'.', {-1, 0, 0, 1}}, {'m', {-1, 0, 0, -1}}};
+std::map<char, std::tuple<float, float>> moveBindings{
+    {'i', {1, 0}}, {'o', {1, -1}}, {'j', {0, 1}}, {'l', {0, -1}}, {'u', {1, 1}}, {',', {-1, 0}}, {'.', {-1, 1}}, {'m', {-1, -1}}};
 
 std::map<char, std::tuple<float, float>> speedBindings{
     {'q', {1.1, 1.1}}, {'z', {0.9, 0.9}}, {'w', {1.1, 1}}, {'x', {0.9, 1}}, {'e', {1, 1.1}}, {'c', {1, 0.9}}};
 
-// Terminal settings management for non-blocking input
 struct TerminalSettings
 {
     termios original;
+
     void save() { tcgetattr(STDIN_FILENO, &original); }
     void restore() { tcsetattr(STDIN_FILENO, TCSANOW, &original); }
 };
@@ -54,7 +53,7 @@ char getKey()
 
 void printVels(float speed, float turn)
 {
-    std::cout << "currently:\tspeed " << speed << "\tturn " << turn << std::endl;
+    std::cout << "Speed: " << speed << " | Turn: " << turn << std::endl;
 }
 
 int main(int argc, char **argv)
@@ -70,25 +69,14 @@ int main(int argc, char **argv)
         throw std::runtime_error("'frame_id' can only be set when 'stamped' is True");
     }
 
-    using TwistMsg = geometry_msgs::msg::Twist;
-    using TwistStampedMsg = geometry_msgs::msg::TwistStamped;
+    auto pub_twist = stamped
+                         ? nullptr
+                         : node->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
+    auto pub_twist_stamped = stamped
+                                 ? node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel", 10)
+                                 : nullptr;
 
-    // Define separate publishers
-    std::shared_ptr<rclcpp::Publisher<TwistMsg>> pub_twist;
-    std::shared_ptr<rclcpp::Publisher<TwistStampedMsg>> pub_twist_stamped;
-
-    if (stamped)
-    {
-        pub_twist_stamped = node->create_publisher<TwistStampedMsg>("cmd_vel", 10);
-    }
-    else
-    {
-        pub_twist = node->create_publisher<TwistMsg>("cmd_vel", 10);
-    }
-
-    float speed = 1.0;
-    float turn = 1.0;
-
+    float speed = 1.0, turn = 1.0;
     TerminalSettings terminal;
     terminal.save();
 
@@ -100,11 +88,11 @@ int main(int argc, char **argv)
         while (rclcpp::ok())
         {
             char key = getKey();
-            float x = 0, y = 0, z = 0, th = 0;
+            float x = 0, th = 0;
 
             if (moveBindings.count(key))
             {
-                std::tie(x, y, z, th) = moveBindings[key];
+                std::tie(x, th) = moveBindings[key];
             }
             else if (speedBindings.count(key))
             {
@@ -113,42 +101,36 @@ int main(int argc, char **argv)
                 speed *= speed_mult;
                 turn *= turn_mult;
                 printVels(speed, turn);
+                continue;
             }
-            else if (key == '\x03')
+            else if (key == '\x03') // CTRL-C to exit
             {
                 break;
             }
 
-            // Ensure z is always 0
-            z = 0;
-
             if (stamped)
             {
-                auto msg = TwistStampedMsg();
+                geometry_msgs::msg::TwistStamped msg;
                 msg.header.stamp = node->get_clock()->now();
                 msg.header.frame_id = frame_id;
                 msg.twist.linear.x = x * speed;
-                msg.twist.linear.y = y * speed;
-                msg.twist.linear.z = z; // z is always 0
                 msg.twist.angular.z = th * turn;
                 pub_twist_stamped->publish(msg);
 
-                RCLCPP_INFO(node->get_logger(), "Key pressed: '%c' | Publishing TwistStamped: linear=(%.2f, %.2f, %.2f), angular=(%.2f, %.2f, %.2f)",
-                            key, msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z,
-                            msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z);
+                RCLCPP_INFO(node->get_logger(), "Key '%c' | Published TwistStamped: [Header: {frame_id: %s}, Twist: {linear: [%.2f, %.2f, %.2f], angular: [%.2f, %.2f, %.2f]}]",
+                            key, frame_id.c_str(), msg.twist.linear.x, 0.0, 0.0,
+                            0.0, 0.0, msg.twist.angular.z);
             }
             else
             {
-                auto msg = TwistMsg();
+                geometry_msgs::msg::Twist msg;
                 msg.linear.x = x * speed;
-                msg.linear.y = y * speed;
-                msg.linear.z = z; // z is always 0
                 msg.angular.z = th * turn;
                 pub_twist->publish(msg);
 
-                RCLCPP_INFO(node->get_logger(), "Key pressed: '%c' | Publishing Twist: linear=(%.2f, %.2f, %.2f), angular=(%.2f, %.2f, %.2f)",
-                            key, msg.linear.x, msg.linear.y, msg.linear.z,
-                            msg.angular.x, msg.angular.y, msg.angular.z);
+                RCLCPP_INFO(node->get_logger(), "Key '%c' | Published Twist: [linear: [%.2f, %.2f, %.2f], angular: [%.2f, %.2f, %.2f]]",
+                            key, msg.linear.x, 0.0, 0.0,
+                            0.0, 0.0, msg.angular.z);
             }
         }
     }
