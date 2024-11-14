@@ -133,8 +133,8 @@ int main(int argc, char **argv)
                 msg.twist.angular.z = th * turn;
                 pub_twist_stamped->publish(msg);
 
-                RCLCPP_INFO(node->get_logger(), "Publishing TwistStamped: linear=(%.2f, %.2f, %.2f), angular=(%.2f, %.2f, %.2f)",
-                            msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z,
+                RCLCPP_INFO(node->get_logger(), "Key pressed: '%c' | Publishing TwistStamped: linear=(%.2f, %.2f, %.2f), angular=(%.2f, %.2f, %.2f)",
+                            key, msg.twist.linear.x, msg.twist.linear.y, msg.twist.linear.z,
                             msg.twist.angular.x, msg.twist.angular.y, msg.twist.angular.z);
             }
             else
@@ -146,8 +146,8 @@ int main(int argc, char **argv)
                 msg.angular.z = th * turn;
                 pub_twist->publish(msg);
 
-                RCLCPP_INFO(node->get_logger(), "Publishing Twist: linear=(%.2f, %.2f, %.2f), angular=(%.2f, %.2f, %.2f)",
-                            msg.linear.x, msg.linear.y, msg.linear.z,
+                RCLCPP_INFO(node->get_logger(), "Key pressed: '%c' | Publishing Twist: linear=(%.2f, %.2f, %.2f), angular=(%.2f, %.2f, %.2f)",
+                            key, msg.linear.x, msg.linear.y, msg.linear.z,
                             msg.angular.x, msg.angular.y, msg.angular.z);
             }
         }
