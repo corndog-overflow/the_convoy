@@ -1,0 +1,5 @@
+cd ~/ros2_ws
+colcon build
+
+ros2 run my_teleop_pkg teleop_twist_keyboard
+
