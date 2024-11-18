@@ -1,5 +1,10 @@
+source /opt/ros/humble/setup.bash
+
+source install/setup.bash
+
 cd ~/ros2_ws
 colcon build
 
 ros2 run my_teleop_pkg teleop_twist_keyboard
 
+ros2 launch turtlebot4_ignition_bringup turtlebot4_ignition.launch.py
