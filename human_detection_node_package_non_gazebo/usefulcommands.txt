@@ -1,0 +1,8 @@
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+
+cd ~/ros2_ws
+
+colcon build --symlink-install --packages-select yolo_person_detector
+
+ros2 run yolo_person_detector yolo_person_detector
