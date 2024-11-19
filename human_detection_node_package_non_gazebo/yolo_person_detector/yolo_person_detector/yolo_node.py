@@ -14,7 +14,7 @@ class YOLOPersonDetector(Node):
         self.bridge = CvBridge()
         self.image_pub = self.create_publisher(Image, 'yolo_detection', 10)
         self.angle_pub = self.create_publisher(Float64, 'person_angle', 10)
-        self.timer = self.create_timer(2.0, self.timer_callback)
+        self.timer = self.create_timer(0.3, self.timer_callback)
         self.cap = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)
         self.cap.set(3, 1280)  # Set width
         self.cap.set(4, 720)   # Set height
