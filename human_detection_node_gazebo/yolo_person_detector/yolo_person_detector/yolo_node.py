@@ -14,6 +14,7 @@ class YOLOPersonDetector(Node):
         self.bridge = CvBridge()
         self.image_pub = self.create_publisher(Image, "yolo_detection", 10)
         self.angle_pub = self.create_publisher(Float64, "person_angle", 10)
+        self.area_pub = self.create_publisher(Float64, "person_disatance", 10)
 
         # Subscribe to the image topic
         self.image_sub = self.create_subscription(
@@ -130,7 +131,18 @@ class YOLOPersonDetector(Node):
                         offset_x = mid_X - frame_center_x
                         angle = (offset_x / (frame_width / 2)) * (
                             self.horizontal_fov / 2
+                            
                         )
+
+                        #calculate area, +publish
+                        length = y2-y1;
+                        width = x2-x1;
+                        area = float(length*width)/10e3
+
+                        area_msg = Float64()
+                        area_msg.data = area
+                        self.area_pub.publish(area_msg)
+
 
                         # Publish the angle
                         angle_msg = Float64()
@@ -143,7 +155,7 @@ class YOLOPersonDetector(Node):
                         )
 
                         confidence = math.ceil(box.conf[0] * 100) / 100
-                        label = f"{self.classNames[int(box.cls[0])]} {confidence:.2f} ({angle:.2f} degrees)"
+                        label = f"{self.classNames[int(box.cls[0])]} {confidence:.2f} ({angle:.2f} degrees)" + " area: " + str(area)
                         cv2.putText(
                             frame,
                             label,
