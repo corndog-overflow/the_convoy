@@ -1,11 +1,13 @@
 #include <rclcpp/rclcpp.hpp>
 #include <geometry_msgs/msg/twist.hpp>
 #include <geometry_msgs/msg/twist_stamped.hpp>
+#include <std_msgs/msg/float64.hpp> // Include for Float64 message
 #include <termios.h>
 #include <unistd.h>
 #include <map>
 #include <tuple>
 #include <iostream>
+#include <thread> // For running rclcpp::spin in a separate thread
 
 // Message for usage
 const char *msg = R"(
@@ -51,9 +53,9 @@ char getKey()
     return key;
 }
 
-void printVels(float speed, float turn)
+void printVels(float speed, float turn, float angle)
 {
-    std::cout << "Speed: " << speed << " | Turn: " << turn << std::endl;
+    std::cout << "\rSpeed: " << speed << " | Turn: " << turn << " | Angle: " << angle << " degrees       " << std::flush;
 }
 
 int main(int argc, char **argv)
@@ -76,14 +78,34 @@ int main(int argc, char **argv)
                                  ? node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel", 10)
                                  : nullptr;
 
-    float speed = 1.0, turn = 1.0;
+    float speed = 1.0, turn = 1.0, person_angle = 0.0;
+
+    // Subscriber to person_angle
+    auto sub_angle = node->create_subscription<std_msgs::msg::Float64>(
+        "person_angle", 10,
+        [&person_angle](std_msgs::msg::Float64::SharedPtr msg)
+        {
+            person_angle = msg->data; // Update the latest received angle
+        });
+
+    // Timer to print angle even without user input
+    auto timer = node->create_wall_timer(
+        std::chrono::milliseconds(100), // Adjust interval as needed
+        [&]()
+        {
+            printVels(speed, turn, person_angle);
+        });
+
+    // Run rclcpp::spin in a separate thread
+    std::thread spin_thread([&]()
+                            { rclcpp::spin(node); });
+
     TerminalSettings terminal;
     terminal.save();
 
     try
     {
         std::cout << msg;
-        printVels(speed, turn);
 
         while (rclcpp::ok())
         {
@@ -100,7 +122,6 @@ int main(int argc, char **argv)
                 std::tie(speed_mult, turn_mult) = speedBindings[key];
                 speed *= speed_mult;
                 turn *= turn_mult;
-                printVels(speed, turn);
                 continue;
             }
             else if (key == '\x03') // CTRL-C to exit
@@ -116,10 +137,6 @@ int main(int argc, char **argv)
                 msg.twist.linear.x = x * speed;
                 msg.twist.angular.z = th * turn;
                 pub_twist_stamped->publish(msg);
-
-                RCLCPP_INFO(node->get_logger(), "Key '%c' | Published TwistStamped: [Header: {frame_id: %s}, Twist: {linear: [%.2f, %.2f, %.2f], angular: [%.2f, %.2f, %.2f]}]",
-                            key, frame_id.c_str(), msg.twist.linear.x, 0.0, 0.0,
-                            0.0, 0.0, msg.twist.angular.z);
             }
             else
             {
@@ -127,10 +144,6 @@ int main(int argc, char **argv)
                 msg.linear.x = x * speed;
                 msg.angular.z = th * turn;
                 pub_twist->publish(msg);
-
-                RCLCPP_INFO(node->get_logger(), "Key '%c' | Published Twist: [linear: [%.2f, %.2f, %.2f], angular: [%.2f, %.2f, %.2f]]",
-                            key, msg.linear.x, 0.0, 0.0,
-                            0.0, 0.0, msg.angular.z);
             }
         }
     }
@@ -141,5 +154,6 @@ int main(int argc, char **argv)
 
     terminal.restore();
     rclcpp::shutdown();
+    spin_thread.join();
     return 0;
 }
