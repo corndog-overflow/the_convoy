@@ -1,0 +1,15 @@
+source /opt/ros/humble/setup.bash
+
+source install/setup.bash
+
+cd ~/ros2_ws
+colcon build
+
+ros2 run my_teleop_pkg teleop_twist_keyboard
+
+ros2 launch turtlebot4_ignition_bringup turtlebot4_ignition.launch.py
+
+ros2 run image_tools showimage --ros-args -r image:=/oakd/rgb/preview/image_raw
+
+ros2 launch turtlebot4_ignition_bringup turtlebot4_ignition.launch.py nav2:=true slam:=true rviz:=true
+ros2 launch turtlebot4_ignition_bringup turtlebot4_ignition.launch.py nav2:=true slam:=false localization:=true rviz:=true
