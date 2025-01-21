@@ -67,6 +67,7 @@ void printStatus(float speed, float turn, float angle, float distance)
               << std::flush;
 }
 
+// TODO Implement actual PID control for smoother turning and to get rid of wiggle
 // Function to track and align robot to a person
 void trackPerson(rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub,
                  float &person_angle, float &person_distance,
