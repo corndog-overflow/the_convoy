@@ -116,7 +116,7 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub,
                  std::atomic<bool> &tracking)
 {
     PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5);
-    PIDController linear_pid(0.1, 0.001, 0.02, -0.3, 0.3);
+    PIDController linear_pid(0.3, 0.005, 0.01, -0.5, 0.5);
     geometry_msgs::msg::Twist cmd_msg;
 
     while (rclcpp::ok() && tracking)
