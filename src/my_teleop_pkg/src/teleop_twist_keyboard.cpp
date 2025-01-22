@@ -7,7 +7,7 @@
 #include <tuple>
 #include <iostream>
 #include <thread>
-#include <atomic> // For atomic flag
+#include <atomic>
 
 const char *usage_msg = R"(
 Hello, this is my custom C++ teleop controller.
@@ -67,29 +67,99 @@ void printStatus(float speed, float turn, float angle, float distance)
               << std::flush;
 }
 
-// TODO Implement actual PID control for smoother turning and to get rid of wiggle
-// Function to track and align robot to a person
+class PIDController
+{
+private:
+    double kp_, ki_, kd_;
+    double integral_ = 0.0;
+    double prev_error_ = 0.0;
+    double output_min_, output_max_;
+    std::chrono::steady_clock::time_point prev_time_;
+    bool first_run_ = true;
+
+public:
+    PIDController(double kp, double ki, double kd, double output_min, double output_max)
+        : kp_(kp), ki_(ki), kd_(kd), output_min_(output_min), output_max_(output_max) {}
+
+    double compute(double error)
+    {
+        auto current_time = std::chrono::steady_clock::now();
+
+        // Initialize on first run
+        if (first_run_)
+        {
+            prev_time_ = current_time;
+            first_run_ = false;
+            return 0.0;
+        }
+
+        // Calculate time delta
+        double dt = std::chrono::duration<double>(current_time - prev_time_).count();
+        prev_time_ = current_time;
+
+        // Proportional term
+        double p_term = kp_ * error;
+
+        // Integral term
+        integral_ += error * dt;
+        double i_term = ki_ * integral_;
+
+        // Derivative term
+        double derivative = (error - prev_error_) / dt;
+        double d_term = kd_ * derivative;
+
+        // Calculate total output
+        double output = p_term + i_term + d_term;
+
+        // Clamp output to limits
+        output = std::min(std::max(output, output_min_), output_max_);
+
+        // Store error for next iteration
+        prev_error_ = error;
+
+        return output;
+    }
+
+    void reset()
+    {
+        integral_ = 0.0;
+        prev_error_ = 0.0;
+        first_run_ = true;
+    }
+};
+
 void trackPerson(rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub,
                  float &person_angle, float &person_distance,
                  float target_distance, rclcpp::Node::SharedPtr node,
                  std::atomic<bool> &tracking)
 {
+    // Initialize PID controllers
+    // Parameters should be tuned for your specific robot
+    PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5); // For rotation
+    PIDController linear_pid(0.1, 0.001, 0.02, -0.3, 0.3);   // For forward/backward
+
     geometry_msgs::msg::Twist cmd_msg;
 
     while (rclcpp::ok() && tracking)
     {
-        // Adjust angular velocity to align with the person
-        cmd_msg.angular.z = (std::abs(person_angle) > 1.0) ? (person_angle > 0 ? -0.3 : 0.3) : 0.0;
+        // Calculate errors
+        double angular_error = person_angle;                     // Error in degrees
+        double linear_error = person_distance - target_distance; // Error in meters
 
-        // Adjust linear velocity to move towards the person
-        cmd_msg.linear.x = (person_distance > target_distance) ? 0.2 : 0.0;
+        // Compute PID outputs
+        cmd_msg.angular.z = -angular_pid.compute(angular_error); // Negative because positive angle needs negative rotation
+        cmd_msg.linear.x = linear_pid.compute(linear_error);
 
+        // Publish command
         pub->publish(cmd_msg);
-        std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
+        // Log status
         RCLCPP_INFO(node->get_logger(),
-                    "Tracking... Angle: %.2f degrees, Distance: %.2f units",
-                    person_angle, person_distance);
+                    "Tracking... Angle: %.2f deg (cmd: %.2f), Distance: %.2f m (cmd: %.2f)",
+                    person_angle, cmd_msg.angular.z, person_distance, cmd_msg.linear.x);
+
+        // Sleep to maintain control loop rate
+        std::this_thread::sleep_for(std::chrono::milliseconds(50)); // 20Hz control loop
     }
 
     // Stop motion
@@ -107,7 +177,7 @@ int main(int argc, char **argv)
 
     float speed = 1.0, turn = 1.0;
     float person_angle = 0.0, person_distance = -1.0;
-    std::atomic<bool> tracking{false}; // Atomic flag for tracking
+    std::atomic<bool> tracking{false};
 
     // Subscribe to person tracking topics
     auto sub_angle = node->create_subscription<std_msgs::msg::Float64>(
