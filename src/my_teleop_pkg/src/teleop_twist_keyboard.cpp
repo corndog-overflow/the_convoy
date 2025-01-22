@@ -116,19 +116,43 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub,
                  std::atomic<bool> &tracking)
 {
     PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5);
-    PIDController linear_pid(0.3, 0.005, 0.01, -0.5, 0.5);
+    // Increased gains and modified approach
+    PIDController linear_pid(0.5, 0.0, 0.2, -0.5, 0.5); // Removed integral term, increased P and D
     geometry_msgs::msg::Twist cmd_msg;
+
+    double prev_distance = person_distance;
+    const double APPROACH_SPEED_LIMIT = 0.3; // Maximum approach speed
 
     while (rclcpp::ok() && tracking)
     {
         double angular_error = person_angle;
         double linear_error = person_distance - target_distance;
+
+        // Calculate approach velocity
+        double approach_velocity = (prev_distance - person_distance) / 0.05; // 50ms control loop
+        prev_distance = person_distance;
+
         cmd_msg.angular.z = -angular_pid.compute(angular_error);
-        cmd_msg.linear.x = linear_pid.compute(linear_error);
+        double pid_output = linear_pid.compute(linear_error);
+
+        // Limit speed based on distance to target
+        double distance_to_target = std::abs(linear_error);
+        double max_speed = std::min(APPROACH_SPEED_LIMIT,
+                                    std::max(0.1, distance_to_target * 0.5));
+
+        cmd_msg.linear.x = std::clamp(pid_output, -max_speed, max_speed);
+
+        // Emergency stop if moving too fast towards target
+        if (approach_velocity > 0.5 && distance_to_target < 1.0)
+        {
+            cmd_msg.linear.x = 0.0;
+            linear_pid.reset(); // Reset PID to prevent integral windup
+        }
+
         pub->publish(cmd_msg);
         RCLCPP_INFO(node->get_logger(),
-                    "Tracking... Angle: %.2f deg (cmd: %.2f), Distance: %.2f m (cmd: %.2f)",
-                    person_angle, cmd_msg.angular.z, person_distance, cmd_msg.linear.x);
+                    "Tracking... Angle: %.2f deg (cmd: %.2f), Distance: %.2f m (cmd: %.2f), Approach Speed: %.2f",
+                    person_angle, cmd_msg.angular.z, person_distance, cmd_msg.linear.x, approach_velocity);
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
