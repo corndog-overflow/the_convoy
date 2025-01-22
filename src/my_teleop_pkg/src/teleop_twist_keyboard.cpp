@@ -29,23 +29,19 @@ P : Toggle align robot to face the person
 CTRL-C to quit
 )";
 
-// Movement key bindings
 std::map<char, std::tuple<float, float>> moveBindings{
     {'i', {1, 0}}, {'o', {1, -1}}, {'j', {0, 1}}, {'l', {0, -1}}, {'u', {1, 1}}, {',', {-1, 0}}, {'.', {-1, 1}}, {'m', {-1, -1}}};
 
-// Speed adjustment key bindings
 std::map<char, std::tuple<float, float>> speedBindings{
     {'q', {1.1, 1.1}}, {'z', {0.9, 0.9}}, {'w', {1.1, 1}}, {'x', {0.9, 1}}, {'e', {1, 1.1}}, {'c', {1, 0.9}}};
 
 struct TerminalSettings
 {
     termios original;
-
     void save() { tcgetattr(STDIN_FILENO, &original); }
     void restore() { tcsetattr(STDIN_FILENO, TCSANOW, &original); }
 };
 
-// Capture keyboard input without waiting for enter
 char getKey()
 {
     struct termios t;
@@ -57,7 +53,6 @@ char getKey()
     return key;
 }
 
-// Display current status
 void printStatus(float speed, float turn, float angle, float distance)
 {
     std::cout << "\rSpeed: " << speed
@@ -85,7 +80,6 @@ public:
     {
         auto current_time = std::chrono::steady_clock::now();
 
-        // Initialize on first run
         if (first_run_)
         {
             prev_time_ = current_time;
@@ -93,28 +87,16 @@ public:
             return 0.0;
         }
 
-        // Calculate time delta
         double dt = std::chrono::duration<double>(current_time - prev_time_).count();
         prev_time_ = current_time;
 
-        // Proportional term
         double p_term = kp_ * error;
-
-        // Integral term
         integral_ += error * dt;
         double i_term = ki_ * integral_;
-
-        // Derivative term
         double derivative = (error - prev_error_) / dt;
         double d_term = kd_ * derivative;
-
-        // Calculate total output
         double output = p_term + i_term + d_term;
-
-        // Clamp output to limits
         output = std::min(std::max(output, output_min_), output_max_);
-
-        // Store error for next iteration
         prev_error_ = error;
 
         return output;
@@ -133,36 +115,23 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub,
                  float target_distance, rclcpp::Node::SharedPtr node,
                  std::atomic<bool> &tracking)
 {
-    // Initialize PID controllers
-    // Parameters should be tuned for your specific robot
-    PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5); // For rotation
-    PIDController linear_pid(0.1, 0.001, 0.02, -0.3, 0.3);   // For forward/backward
-
+    PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5);
+    PIDController linear_pid(0.1, 0.001, 0.02, -0.3, 0.3);
     geometry_msgs::msg::Twist cmd_msg;
 
     while (rclcpp::ok() && tracking)
     {
-        // Calculate errors
-        double angular_error = person_angle;                     // Error in degrees
-        double linear_error = person_distance - target_distance; // Error in meters
-
-        // Compute PID outputs
-        cmd_msg.angular.z = -angular_pid.compute(angular_error); // Negative because positive angle needs negative rotation
+        double angular_error = person_angle;
+        double linear_error = person_distance - target_distance;
+        cmd_msg.angular.z = -angular_pid.compute(angular_error);
         cmd_msg.linear.x = linear_pid.compute(linear_error);
-
-        // Publish command
         pub->publish(cmd_msg);
-
-        // Log status
         RCLCPP_INFO(node->get_logger(),
                     "Tracking... Angle: %.2f deg (cmd: %.2f), Distance: %.2f m (cmd: %.2f)",
                     person_angle, cmd_msg.angular.z, person_distance, cmd_msg.linear.x);
-
-        // Sleep to maintain control loop rate
-        std::this_thread::sleep_for(std::chrono::milliseconds(50)); // 20Hz control loop
+        std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
-    // Stop motion
     cmd_msg.linear.x = 0.0;
     cmd_msg.angular.z = 0.0;
     pub->publish(cmd_msg);
@@ -179,7 +148,6 @@ int main(int argc, char **argv)
     float person_angle = 0.0, person_distance = -1.0;
     std::atomic<bool> tracking{false};
 
-    // Subscribe to person tracking topics
     auto sub_angle = node->create_subscription<std_msgs::msg::Float64>(
         "person_angle", 10,
         [&person_angle](std_msgs::msg::Float64::SharedPtr msg)
@@ -194,13 +162,11 @@ int main(int argc, char **argv)
             person_distance = msg->data;
         });
 
-    // Periodically print status
     auto timer = node->create_wall_timer(
         std::chrono::milliseconds(100),
         [&]()
         { printStatus(speed, turn, person_angle, person_distance); });
 
-    // Spin in a separate thread
     std::thread spin_thread([&]()
                             { rclcpp::spin(node); });
 
@@ -229,20 +195,21 @@ int main(int argc, char **argv)
             }
             else if (key == 'P' || key == 'p')
             {
-                // Toggle tracking
                 tracking = !tracking;
                 if (tracking)
                 {
-                    std::thread(trackPerson, pub_twist, std::ref(person_angle), std::ref(person_distance), 2.0, node, std::ref(tracking)).detach();
+                    std::thread(trackPerson, pub_twist, std::ref(person_angle),
+                                std::ref(person_distance), 2.0, node,
+                                std::ref(tracking))
+                        .detach();
                 }
                 continue;
             }
             else if (key == '\x03')
-            { // CTRL-C
+            {
                 break;
             }
 
-            // Publish the twist message
             geometry_msgs::msg::Twist msg;
             msg.linear.x = x * speed;
             msg.angular.z = th * turn;
