@@ -7,6 +7,8 @@ A robotic convoy that seamlessly collaborates as one unit, though segmented into
 With robust autonomous navigation systems, the convoy engages in follow the leader behavior and obstacle avoidance to traverse dynamic environments for use in fields like agriculture, disaster relief and medical environments.
 This high level of autonomy reduces bottlenecks in safety and productivity.
 
+Our Bible
+https://turtlebot.github.io/turtlebot4-user-manual/
 
 Our main ROS2 nodes are placed within the src folder in the root of this repo.
 
