@@ -17,3 +17,6 @@ Our desktop is connected to the router. Its password is: asdf
 1. Make sure robot is turned on
 2. Open terminal and type in: ssh ubuntu@192.168.1.208
 3. Should work. Password is: turtlebot4
+
+Create® 3 webserver:
+1. Open web browser and enter: 192.168.1.208:8080
