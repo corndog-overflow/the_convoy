@@ -9,3 +9,9 @@ This high level of autonomy reduces bottlenecks in safety and productivity.
 
 
 Our main ROS2 nodes are placed within the src folder in the root of this repo.
+
+INSTRUCTIONS TO SSH:
+Our desktop is connected to the router
+1. Make sure robot is turned on
+2. Open terminal and type in: ssh ubuntu@192.168.1.208
+3. Should work. Password is: turtlebot4
