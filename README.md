@@ -14,11 +14,11 @@ Our main ROS2 nodes are placed within the src folder in the root of this repo.
 
 Setup environment:
 Enter:
-'''
+```bash
 source /opt/ros/jazzy/setup.bash
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 export ROS_DOMAIN_ID=0
-'''
+
 INSTRUCTIONS TO SSH:
 Our desktop is connected to the router. Its password is: asdf
 1. Make sure robot is turned on
