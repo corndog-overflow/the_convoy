@@ -1,6 +1,5 @@
-// ROS2 teleop controller with person tracking capabilities
 #include <rclcpp/rclcpp.hpp>
-#include <geometry_msgs/msg/twist.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <termios.h>
 #include <unistd.h>
@@ -124,15 +123,14 @@ public:
 };
 
 // Function to handle person tracking behavior
-void trackPerson(rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub,
+void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub,
                  float &person_angle, float &person_distance,
                  float target_distance, rclcpp::Node::SharedPtr node,
                  std::atomic<bool> &tracking)
 {
-    // Initialize PID controllers for angular and linear motion
     PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5);
     PIDController linear_pid(0.5, 0.0, 0.2, -0.5, 0.5);
-    geometry_msgs::msg::Twist cmd_msg;
+    geometry_msgs::msg::TwistStamped cmd_msg;
 
     double prev_distance = person_distance;
     const double APPROACH_SPEED_LIMIT = 0.3;
@@ -146,31 +144,36 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::Twist>::SharedPtr pub,
         prev_distance = person_distance;
 
         // Compute control commands
-        cmd_msg.angular.z = -angular_pid.compute(angular_error);
+        cmd_msg.twist.angular.z = -angular_pid.compute(angular_error);
         double pid_output = linear_pid.compute(linear_error);
 
         // Limit approach speed based on distance
         double distance_to_target = std::abs(linear_error);
         double max_speed = std::min(APPROACH_SPEED_LIMIT, std::max(0.1, distance_to_target * 0.5));
-        cmd_msg.linear.x = std::clamp(pid_output, -max_speed, max_speed);
+        cmd_msg.twist.linear.x = std::clamp(pid_output, -max_speed, max_speed);
 
         // Safety check: stop if approaching too fast when close
         if (approach_velocity > 0.5 && distance_to_target < 1.0)
         {
-            cmd_msg.linear.x = 0.0;
+            cmd_msg.twist.linear.x = 0.0;
             linear_pid.reset();
         }
+
+        // Set the timestamp
+        cmd_msg.header.stamp = node->get_clock()->now();
+        cmd_msg.header.frame_id = "base_link";
 
         pub->publish(cmd_msg);
         RCLCPP_INFO(node->get_logger(),
                     "Tracking... Angle: %.2f deg (cmd: %.2f), Distance: %.2f m (cmd: %.2f), Approach Speed: %.2f",
-                    person_angle, cmd_msg.angular.z, person_distance, cmd_msg.linear.x, approach_velocity);
+                    person_angle, cmd_msg.twist.angular.z, person_distance, cmd_msg.twist.linear.x, approach_velocity);
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
     // Stop robot when tracking ends
-    cmd_msg.linear.x = 0.0;
-    cmd_msg.angular.z = 0.0;
+    cmd_msg.twist.linear.x = 0.0;
+    cmd_msg.twist.angular.z = 0.0;
+    cmd_msg.header.stamp = node->get_clock()->now();
     pub->publish(cmd_msg);
     RCLCPP_INFO(node->get_logger(), "Stopped tracking.");
 }
@@ -180,7 +183,7 @@ int main(int argc, char **argv)
     // Initialize ROS2 node
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("teleop_twist_keyboard");
-    auto pub_twist = node->create_publisher<geometry_msgs::msg::Twist>("cmd_vel", 10);
+    auto pub_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel", 10);
 
     // Initialize control variables
     float speed = 1.0, turn = 1.0;
@@ -258,10 +261,12 @@ int main(int argc, char **argv)
                 break;
             }
 
-            // Publish velocity command
-            geometry_msgs::msg::Twist msg;
-            msg.linear.x = x * speed;
-            msg.angular.z = th * turn;
+            // Publish velocity command with timestamp
+            geometry_msgs::msg::TwistStamped msg;
+            msg.header.stamp = node->get_clock()->now();
+            msg.header.frame_id = "base_link";
+            msg.twist.linear.x = x * speed;
+            msg.twist.angular.z = th * turn;
             pub_twist->publish(msg);
         }
     }
