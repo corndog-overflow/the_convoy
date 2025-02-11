@@ -15,7 +15,7 @@ class ColorDetector(Node):
         self.timer = self.create_timer(0.3, self.timer_callback)
 
         # camera capture initialization
-        self.cap = cv2.VideoCapture("/dev/video0", cv2.CAP_V4L2)        # CHANGE FOR USE ON TURTLEBOT / GAZEBO
+        self.cap = cv2.VideoCapture("/oakd/rgb/preview/image_raw", cv2.CAP_V4L2)        # CHANGE FOR USE ON TURTLEBOT / GAZEBO
         if not self.cap.isOpened():
             self.get_logger().warning("Failed to open camera!")
             return
