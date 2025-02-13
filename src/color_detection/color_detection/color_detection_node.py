@@ -12,6 +12,7 @@ class ColorDetector(Node):
         self.bridge = CvBridge()
         self.image_pub = self.create_publisher(Image, 'color_detection', 10)
         self.angle_pub = self.create_publisher(Float64, 'color_angle', 10)
+        self.area_pub = self.create_publisher(Float64, 'bounding_box_area', 10)
 
         self.image_sub = self.create_subscription(Image, '/oakd/rgb/preview/image_raw', self.image_callback, 10)
 
@@ -73,7 +74,7 @@ class ColorDetector(Node):
 
                     area = w * h
                     area_msg = Float64()
-                    area_msg.data = area
+                    area_msg.data = float(area)
                     self.area_pub.publish(area_msg)
 
         return output
