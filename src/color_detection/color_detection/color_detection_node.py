@@ -12,22 +12,24 @@ class ColorDetector(Node):
         self.bridge = CvBridge()
         self.image_pub = self.create_publisher(Image, 'color_detection', 10)
         self.angle_pub = self.create_publisher(Float64, 'color_angle', 10)
-        self.timer = self.create_timer(0.3, self.timer_callback)
 
-        # camera capture initialization
-        self.cap = cv2.VideoCapture("/oakd/rgb/preview/image_raw", cv2.CAP_V4L2)        # CHANGE FOR USE ON TURTLEBOT / GAZEBO
-        if not self.cap.isOpened():
-            self.get_logger().warning("Failed to open camera!")
-            return
-        else:
-            self.get_logger().info("Camera opened successfully!")
+        self.image_sub = self.create_subscription(Image, '/oakd/rgb/image_raw', self.image_callback, 10)
 
-
-        self.cap.set(3, 1280)  #  width
-        self.cap.set(4, 720)   #  height
         self.horizontal_fov = 60.0  # degrees
+        self.latest_frame = None  # latest processed frame
+        self.blank_frame = np.zeros((480, 640, 3), dtype=np.uint8)  # default blank frame
 
         cv2.namedWindow("color det", cv2.WINDOW_NORMAL)  # create the window
+
+    def image_callback(self, msg):
+        self.get_logger().info("Received image from OAK-D camera")
+        try:
+            frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+            self.latest_frame = self.process_frame(frame)
+            image_message = self.bridge.cv2_to_imgmsg(self.latest_frame, encoding="bgr8")
+            self.image_pub.publish(image_message)
+        except Exception as e:
+            self.get_logger().error(f"Error in image callback: {e}")
 
     def process_frame(self, frame):
         self.get_logger().info("Processing frame...")
@@ -39,7 +41,7 @@ class ColorDetector(Node):
         upper_yellow = np.array([10, 255, 255])
 
         mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
-        kernel = np.ones((6, 6), np.uint8)  # smoothing kernel
+        kernel = np.ones((6, 6), np.uint8)  # Smoothing kernel
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -71,32 +73,7 @@ class ColorDetector(Node):
 
         return output
 
-    def timer_callback(self):
-        self.get_logger().info("Timer callback triggered")
-        ret, frame = self.cap.read()
-        if not ret:
-            self.get_logger().warning("Image capture failure")
-            return
-
-        # Confirm that the frame is not empty
-        if frame is None or frame.size == 0:
-            self.get_logger().warning("Captured frame is empty")
-            return
-
-        self.get_logger().info(f"Captured frame shape: {frame.shape}")
-
-        processed_frame = self.process_frame(frame)
-        image_message = self.bridge.cv2_to_imgmsg(processed_frame, encoding="bgr8")
-        self.image_pub.publish(image_message)
-
-
-        cv2.imshow("color det", processed_frame)
-        cv2.waitKey(1)  # Process GUI events
-        cv2.imshow("color det", processed_frame)  # refresh display
-
-
     def destroy_node(self):
-        self.cap.release()
         cv2.destroyAllWindows()
         super().destroy_node()
 
@@ -105,15 +82,18 @@ def main(args=None):
     print("ROS2 initialized")  
     node = ColorDetector()
 
-    if node.cap.isOpened():
-        print("Camera initialized successfully")
-        rclpy.spin(node)
-    else:
-        print("Camera not initialized. Exiting node.")
-
-    node.destroy_node()
-    rclpy.shutdown()
+    try:
+        while rclpy.ok():
+            rclpy.spin_once(node, timeout_sec=0.1)  # process ROS events
+            
+            # show latest processed frame, or blank if no image received
+            frame_to_show = node.latest_frame if node.latest_frame is not None else node.blank_frame
+            cv2.imshow("color det", frame_to_show)
+            if cv2.waitKey(1) == 27:  # exit w/ 'ESC' key
+                break
+    finally:
+        node.destroy_node()
+        rclpy.shutdown()
 
 if __name__ == "__main__":
     main()
-
