@@ -13,7 +13,7 @@ class ColorDetector(Node):
         self.image_pub = self.create_publisher(Image, 'color_detection', 10)
         self.angle_pub = self.create_publisher(Float64, 'color_angle', 10)
 
-        self.image_pub = self.create_subscription(Image, '/oakd/rgb/image_raw', self.image_callback, 10)
+        self.image_pub = self.create_subscription(Image, '/oakd/rgb/preview/image_raw', self.image_callback, 10)
 
         self.horizontal_fov = 60.0  # degrees
         cv2.namedWindow("color det", cv2.WINDOW_NORMAL)  # create the window
