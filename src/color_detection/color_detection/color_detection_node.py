@@ -71,6 +71,11 @@ class ColorDetector(Node):
                     x, y, w, h = cv2.boundingRect(largest_contour)
                     cv2.rectangle(output, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
+                    area = w * h
+                    area_msg = Float64()
+                    area_msg.data = area
+                    self.area_pub.publish(area_msg)
+
         return output
 
     def destroy_node(self):
