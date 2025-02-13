@@ -13,21 +13,21 @@ class ColorDetector(Node):
         self.image_pub = self.create_publisher(Image, 'color_detection', 10)
         self.angle_pub = self.create_publisher(Float64, 'color_angle', 10)
 
-        self.image_sub = self.create_subscription(Image, '/oakd/rgb/image_raw', self.image_callback, 10)
+        self.image_pub = self.create_subscription(Image, '/oakd/rgb/image_raw', self.image_callback, 10)
 
         self.horizontal_fov = 60.0  # degrees
-        self.latest_frame = None  # latest processed frame
-        self.blank_frame = np.zeros((480, 640, 3), dtype=np.uint8)  # default blank frame
-
         cv2.namedWindow("color det", cv2.WINDOW_NORMAL)  # create the window
 
     def image_callback(self, msg):
         self.get_logger().info("Received image from OAK-D camera")
         try:
             frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
-            self.latest_frame = self.process_frame(frame)
-            image_message = self.bridge.cv2_to_imgmsg(self.latest_frame, encoding="bgr8")
+            processed_frame = self.process_frame(frame)
+            image_message = self.bridge.cv2_to_imgmsg(processed_frame, encoding="bgr8")
             self.image_pub.publish(image_message)
+
+            cv2.imshow("color det", processed_frame)
+            cv2.waitKey(1)  # process GUI events
         except Exception as e:
             self.get_logger().error(f"Error in image callback: {e}")
 
@@ -41,7 +41,7 @@ class ColorDetector(Node):
         upper_yellow = np.array([10, 255, 255])
 
         mask = cv2.inRange(hsv, lower_yellow, upper_yellow)
-        kernel = np.ones((6, 6), np.uint8)  # Smoothing kernel
+        kernel = np.ones((6, 6), np.uint8)  # smoothing kernel
         mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
 
         contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -82,18 +82,10 @@ def main(args=None):
     print("ROS2 initialized")  
     node = ColorDetector()
 
-    try:
-        while rclpy.ok():
-            rclpy.spin_once(node, timeout_sec=0.1)  # process ROS events
-            
-            # show latest processed frame, or blank if no image received
-            frame_to_show = node.latest_frame if node.latest_frame is not None else node.blank_frame
-            cv2.imshow("color det", frame_to_show)
-            if cv2.waitKey(1) == 27:  # exit w/ 'ESC' key
-                break
-    finally:
-        node.destroy_node()
-        rclpy.shutdown()
+    rclpy.spin(node)
+
+    node.destroy_node()
+    rclpy.shutdown()
 
 if __name__ == "__main__":
     main()
