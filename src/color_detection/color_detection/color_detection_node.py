@@ -57,7 +57,7 @@ class ColorDetector(Node):
                 if M["m00"] != 0:
                     cx = int(M["m10"] / M["m00"])
                     cy = int(M["m01"] / M["m00"])
-                    cv2.circle(output, (cx, cy), 5, (0, 0, 255), -1)  # Red dot
+                    cv2.circle(output, (cx, cy), 5, (0, 0, 255), -1)  # Red dot centroid
                     cv2.line(output, (cx, 0), (cx, frame.shape[0]), (0, 0, 255), 2)
 
                     frame_width = frame.shape[1]
