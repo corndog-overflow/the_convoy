@@ -1,0 +1,2 @@
+# This forces git to avoid commiting hidden files starting with '.'
+.*
