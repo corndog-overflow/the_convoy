@@ -44,13 +44,27 @@ The Create3 webserver allows you to access and modify settings that pertain to t
 ```
 
 ### Terminal Environment Setup:
+Whenever you open a new terminal window, paste all of this in:
 ```bash
 cd ~/ros2_ws
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 export ROS_DOMAIN_ID=0
+```
 
+### Quick Launch Nodes
+Motor Control/Teleop Node
+```bash
+ros2 run my_teleop_pkg teleop_twist_keyboard
+```
+YOLO person tracker Node
+```bash
+ros2 run yolo_person_detector yolo_person_detector
+```
+Color detection Node
+```bash
+ros2 run color_detection color_detection_node
 ```
 
 ### How to use Nav2 with SLAM and Rviz:
