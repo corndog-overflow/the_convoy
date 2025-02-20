@@ -50,6 +50,22 @@ source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 export ROS_DOMAIN_ID=0
-colcon build
 
 ```
+
+### How to use Nav2 with SLAM and Rviz:
+1. Run synchronous SLAM:
+```bash
+ros2 launch turtlebot4_navigation slam.launch.py
+```
+2. Run nav2:
+```bash
+ros2 launch turtlebot4_navigation nav2.launch.py
+```
+3. Run Rviz:
+```bash
+ros2 launch turtlebot4_viz view_navigation.launch.py
+```
+4. Make sure to set pose correctly.
+5. Use set goal to make robot go.
+
