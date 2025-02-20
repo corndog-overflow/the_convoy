@@ -25,6 +25,12 @@ Follow these steps if the Turtlebot does not start up correctly or if you need a
 1. If on dock, remove from dock and wait for lights. If not, dock then undock so it wakes up.
 2. Hold down the power button and wait for it to blink 5 times and then let go. There should be a chime that plays followed by all the lights on the robot turning off. Repeat this step if it does not work the first time.
 3. Give it a couple seconds. Then place the robot on the dock and watch for the lights to turn on and the LIDAR to start spinning. Remove the robot from the dock once you see this.
+4. In the terminal, spam this command:
+```bash
+ros2 topic list
+```
+and look out to see if all the /oakd topics are online. This is a good sign
+5. Give it a minute and it should be fresh and ready. The Turtlebot sometimes chimes when it is fully booted up.
 
 
 ### How To SSH into our Turtlebot:
