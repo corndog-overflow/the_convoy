@@ -19,6 +19,16 @@ https://turtlebot.github.io/turtlebot4-user-manual/
 2. Wait
 3. Login to convoy profile using password: ```asdf```
 
+### Terminal Environment Setup:
+Whenever you open a new terminal window, paste all of this in:
+```bash
+cd ~/ros2_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export ROS_DOMAIN_ID=0
+```
+
 ### Turtlebot Startup/Restart Procedure:
 Follow these steps if the Turtlebot does not start up correctly or if you need a fresh reboot for whatever reason.
 
@@ -47,16 +57,6 @@ The Create3 webserver allows you to access and modify settings that pertain to t
 1. Open web browser and enter this url: 
 ```
 192.168.1.208:8080
-```
-
-### Terminal Environment Setup:
-Whenever you open a new terminal window, paste all of this in:
-```bash
-cd ~/ros2_ws
-source /opt/ros/jazzy/setup.bash
-source install/setup.bash
-export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
-export ROS_DOMAIN_ID=0
 ```
 
 ### Quick Launch Nodes
