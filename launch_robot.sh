@@ -7,19 +7,24 @@ source install/setup.bash
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 export ROS_DOMAIN_ID=0
 
-# Launch nodes in background
-echo "Starting YOLO person tracker node..."
-ros2 run yolo_person_detector yolo_person_detector &
-YOLO_PID=$!
+# Function to launch YOLO person detector in a new terminal
+launch_yolo() {
+    gnome-terminal --title="YOLO Person Detector" -- bash -c "cd ~/ros2_ws && \
+    source /opt/ros/jazzy/setup.bash && \
+    source install/setup.bash && \
+    export RMW_IMPLEMENTATION=rmw_fastrtps_cpp && \
+    export ROS_DOMAIN_ID=0 && \
+    ros2 run yolo_person_detector yolo_person_detector; exec bash"
+}
 
-echo "Starting motor control/teleop node..."
-ros2 run my_teleop_pkg teleop_twist_keyboard &
-TELEOP_PID=$!
+# Launch YOLO in a separate terminal
+echo "Starting YOLO person tracker node in a new terminal window..."
+launch_yolo
 
-# Handle script termination to properly shut down nodes
-trap 'kill $YOLO_PID $TELEOP_PID; echo "Shutting down nodes..."; exit' SIGINT SIGTERM
+# Wait a moment for YOLO to initialize
+sleep 2
 
-echo "Nodes are running. Press Ctrl+C to stop."
-
-# Keep script running until user terminates it
-wait
+# Run teleop in the current terminal (to capture keyboard input)
+echo "Starting teleop node in the current terminal..."
+echo "Use the keyboard to control the robot. Close this terminal when finished."
+ros2 run my_teleop_pkg teleop_twist_keyboard
