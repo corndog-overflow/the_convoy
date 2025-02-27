@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
+
+
 import rclpy
 from rclpy.node import Node
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
 
 class PathPlannerNode(Node):
     def __init__(self):
+        print("TESTING1")
         super().__init__('path_planner_node')
+
         # Create navigator
         self.navigator = TurtleBot4Navigator()
+        print("TESTING2")
         # Create a timer to start navigation after node is fully initialized
         self.timer = self.create_timer(1.0, self.start_navigation)
+        print("TESTING3")
         self.get_logger().info('Path Planner Node initialized')
 
     def start_navigation(self):
@@ -17,11 +23,22 @@ class PathPlannerNode(Node):
         self.destroy_timer(self.timer)
         # Set initial pose
         initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
-        self.navigator.setInitialPose(initial_pose)
+        print("TESTING4")
+
+        #self.navigator.setInitialPose(initial_pose)  SLAM Handles this
+        print("TESTING5")
+
         # Wait for Nav2
-        self.navigator.waitUntilNav2Active()
+        self.navigator.waitUntilNav2Active(navigator='bt_navigator', localizer='slam_toolbox') #parameters are required for SLAM
+
+
+        print("TESTING6")
+
         # Set goal poses
-        goal_pose = self.navigator.getPoseStamped([1.0, 1.0], TurtleBot4Directions.EAST)
+        goal_pose = self.navigator.getPoseStamped([4.0, 2.0], TurtleBot4Directions.EAST)
+
+        print("TESTING7")
+
         # Optional: Uncomment if you need docking/undocking
         # if not self.navigator.getDockedStatus():
         #     self.get_logger().info('Docking before initializing pose')
@@ -37,6 +54,8 @@ class PathPlannerNode(Node):
         self.get_logger().info('Navigation completed')
 
 def main(args=None):
+
+
     rclpy.init(args=args)
     node = PathPlannerNode()
     try:
