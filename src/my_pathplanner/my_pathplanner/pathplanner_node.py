@@ -35,7 +35,7 @@ class PathPlannerNode(Node):
         print("TESTING6")
 
         # Set goal poses
-        goal_pose = self.navigator.getPoseStamped([4.0, 2.0], TurtleBot4Directions.EAST)
+        goal_pose = self.navigator.getPoseStamped([1.95, 4.4], TurtleBot4Directions.EAST)
 
         print("TESTING7")
 
@@ -68,3 +68,5 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
+#ros2 run my_pathplanner path_planner
