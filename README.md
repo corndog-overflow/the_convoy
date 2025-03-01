@@ -72,6 +72,10 @@ Color detection Node
 ```bash
 ros2 run color_detection color_detection_node
 ```
+Path Planning Node
+```bash
+ros2 run my_pathplanner path_planner
+```
 
 ### How to use Nav2 with SLAM and Rviz:
 1. Run synchronous SLAM:
