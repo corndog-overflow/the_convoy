@@ -86,9 +86,11 @@ ros2 launch turtlebot4_navigation nav2.launch.py
 ```bash
 ros2 launch turtlebot4_viz view_navigation.launch.py
 ```
-4. Make sure to set pose correctly.
-5. Use set goal to make robot go.
-
+OR
+handle all 3 steps by running bash script initNav.sh:
+```bash
+./initNav.sh
+```
 ### Start robot with bash script launch_robot.sh:
 ```bash
 cd ~/ros2_ws
