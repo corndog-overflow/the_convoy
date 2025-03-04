@@ -46,8 +46,13 @@ and look out to see if all the /oakd topics are online. This is a good sign
 ### How To SSH into our Turtlebot:
 1. Make sure robot is on
 2. Open terminal and type in:
+Bot 1 
 ```bash
 ssh ubuntu@192.168.1.208
+```
+Bot 2
+```bash
+ssh ubuntu@192.168.1.160
 ```
 3. Should just work. Password is: ```turtlebot4```
 
