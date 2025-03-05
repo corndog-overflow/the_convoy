@@ -59,9 +59,10 @@ ssh ubuntu@192.168.1.160
 ### How to access Create® 3 webserver:
 The Create3 webserver allows you to access and modify settings that pertain to the Create3 computer on the Turtlebot.
 
-1. Open web browser and enter this url: 
+1. Open web browser and enter this url for robot1 and robot2 respectively: 
 ```
 192.168.1.208:8080
+192.168.1.160:8080
 ```
 
 ### Quick Launch Nodes
