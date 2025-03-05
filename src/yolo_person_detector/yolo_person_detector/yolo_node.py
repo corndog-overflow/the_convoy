@@ -6,24 +6,41 @@ from cv_bridge import CvBridge
 import cv2
 from ultralytics import YOLO
 import math
+from rclpy.parameter import Parameter
 
 
 class YOLOPersonDetector(Node):
     def __init__(self):
         super().__init__("yolo_person_detector")
 
+        # Declare and get robot namespace parameter
+        self.declare_parameter('robot_namespace', '')
+        self.robot_namespace = self.get_parameter('robot_namespace').value
+        
+        # Create topic names with namespace if provided
+        camera_topic = self.apply_namespace("/oakd/rgb/preview/image_raw")
+        detection_topic = self.apply_namespace("yolo_detection")
+        angle_topic = self.apply_namespace("person_angle")
+        distance_topic = self.apply_namespace("person_distance")
+        
+        self.get_logger().info(f"Using robot namespace: '{self.robot_namespace}'")
+        self.get_logger().info(f"Subscribing to camera topic: {camera_topic}")
+        self.get_logger().info(f"Publishing detection image to: {detection_topic}")
+        self.get_logger().info(f"Publishing person angle to: {angle_topic}")
+        self.get_logger().info(f"Publishing person distance to: {distance_topic}")
+
         self.bridge = CvBridge()
         self.model = YOLO("weights/yolov8n.pt")
         self.horizontal_fov = 60.0  # Camera's horizontal field of view in degrees
 
         # Publishers
-        self.image_pub = self.create_publisher(Image, "yolo_detection", 10)
-        self.angle_pub = self.create_publisher(Float64, "person_angle", 10)
-        self.distance_pub = self.create_publisher(Float64, "person_distance", 10)
+        self.image_pub = self.create_publisher(Image, detection_topic, 10)
+        self.angle_pub = self.create_publisher(Float64, angle_topic, 10)
+        self.distance_pub = self.create_publisher(Float64, distance_topic, 10)
 
         # Subscriber
         self.image_sub = self.create_subscription(
-            Image, "/oakd/rgb/preview/image_raw", self.image_callback, 10
+            Image, camera_topic, self.image_callback, 10
         )
 
         # YOLO class names
@@ -110,6 +127,19 @@ class YOLOPersonDetector(Node):
             "toothbrush",
         ]
 
+    def apply_namespace(self, topic):
+        """Apply robot namespace to a topic if namespace is provided"""
+        if not self.robot_namespace:
+            return topic
+            
+        # Handle absolute topic names (starting with /)
+        if topic.startswith('/'):
+            # For absolute topics, prepend namespace before the first slash
+            return f"/{self.robot_namespace}{topic}"
+        else:
+            # For relative topics, simply prepend namespace
+            return f"{self.robot_namespace}/{topic}"
+
     def image_callback(self, msg):
         try:
             # Convert the ROS image to OpenCV format
@@ -182,7 +212,8 @@ class YOLOPersonDetector(Node):
     def publish_annotated_frame(self, frame):
         image_message = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
         self.image_pub.publish(image_message)
-        cv2.imshow("YOLO Detection", frame)
+        window_name = f"YOLO Detection {self.robot_namespace}" if self.robot_namespace else "YOLO Detection"
+        cv2.imshow(window_name, frame)
         cv2.waitKey(1)
 
     def destroy_node(self):
@@ -196,3 +227,7 @@ def main(args=None):
     rclpy.spin(node)
     node.destroy_node()
     rclpy.shutdown()
+
+
+if __name__ == "__main__":
+    main()
