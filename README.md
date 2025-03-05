@@ -72,7 +72,8 @@ ros2 run my_teleop_pkg teleop_twist_keyboard --ros-args -p robot_namespace:=robo
 ```
 YOLO person tracker Node
 ```bash
-ros2 run yolo_person_detector yolo_person_detector
+ros2 run yolo_person_detector yolo_person_detector --ros-args -p robot_namespace:=robot1
+ros2 run yolo_person_detector yolo_person_detector --ros-args -p robot_namespace:=robot2
 ```
 Color detection Node
 ```bash
