@@ -117,6 +117,6 @@ chmod +x launch_robot.sh
 
 ros2 launch turtlebot4_navigation nav2.launch.py namespace:=robot2 use_namespace:=true remap:=/odom:=/robot2/odom
 
-ros2 launch turtlebot4_navigation nav2.launch.py namespace:=robot2 use_sim_time:=false use_namespace:=true
+ros2 launch turtlebot4_navigation nav2.launch.py namespace:=robot2
 
 ros2 launch turtlebot4_viz view_navigation.launch.py namespace:=robot2
