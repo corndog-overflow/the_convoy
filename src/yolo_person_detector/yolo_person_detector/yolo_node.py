@@ -12,6 +12,9 @@ from rclpy.parameter import Parameter
 class YOLOPersonDetector(Node):
     def __init__(self):
         super().__init__("yolo_person_detector")
+        
+        # Store window names for proper cleanup
+        self.window_names = []
 
         # Declare and get robot namespace parameter
         self.declare_parameter('robot_namespace', '')
@@ -212,12 +215,43 @@ class YOLOPersonDetector(Node):
     def publish_annotated_frame(self, frame):
         image_message = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
         self.image_pub.publish(image_message)
-        window_name = f"YOLO Detection {self.robot_namespace}" if self.robot_namespace else "YOLO Detection"
+        
+        # Create a guaranteed unique window name based on node name and namespace
+        node_id = self.get_name() + '_' + str(id(self))  # Use the object's memory address for uniqueness
+        window_name = f"YOLO_Detection_{self.robot_namespace}_{node_id}" if self.robot_namespace else f"YOLO_Detection_{node_id}"
+        
+        # Track this window name for proper cleanup
+        if window_name not in self.window_names:
+            self.window_names.append(window_name)
+        
+        # Set window position based on namespace to avoid overlapping windows
+        if self.robot_namespace == 'robot1':
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            cv2.moveWindow(window_name, 50, 50)  # Position for robot1 window
+        elif self.robot_namespace == 'robot2':
+            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
+            cv2.moveWindow(window_name, 700, 50)  # Position for robot2 window
+        
         cv2.imshow(window_name, frame)
         cv2.waitKey(1)
 
     def destroy_node(self):
-        cv2.destroyAllWindows()
+        # We need to be more careful about cleaning up CV windows to avoid conflicts
+        try:
+            # First try to close specific windows we created
+            for window_name in self.window_names:
+                try:
+                    cv2.destroyWindow(window_name)
+                    # Give a little time for window to close
+                    cv2.waitKey(50)
+                except Exception as e:
+                    self.get_logger().error(f"Error closing window {window_name}: {e}")
+                    
+            # Then, as a fallback, try to close all windows
+            cv2.destroyAllWindows()
+            cv2.waitKey(100)
+        except Exception as e:
+            self.get_logger().error(f"Error destroying windows: {e}")
         super().destroy_node()
 
 
