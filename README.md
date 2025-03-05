@@ -100,7 +100,11 @@ handle all 3 steps by running bash script initNav.sh:
 ```bash
 ./initNav.sh
 ```
-add namespace:=/robot1 for the intended robot
+add 
+```bash
+namespace:=/robot1 for the intended robot
+```
+at the end of any command to specify a robot
 ### Start robot with bash script launch_robot.sh:
 ```bash
 cd ~/ros2_ws
