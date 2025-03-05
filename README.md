@@ -115,7 +115,13 @@ chmod +x launch_robot.sh
 ./launch_robot.sh
 ```
 
-ros2 launch turtlebot4_navigation nav2.launch.py namespace:=robot2 use_namespace:=true remap:=/odom:=/robot2/odom
+ros2 launch turtlebot4_navigation slam.launch.py namespace:=robot2 \
+  use_namespace:=true \
+  slam_params_file:=~/robot2_slam_params.yaml \
+  remap:=/tf:=/robot2/tf \
+  remap:=/tf_static:=/robot2/tf_static \
+  remap:=/scan:=/robot2/scan \
+  remap:=/odom:=/robot2/odom
 
 ros2 launch turtlebot4_navigation nav2.launch.py namespace:=robot2
 
