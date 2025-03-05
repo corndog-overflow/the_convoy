@@ -67,7 +67,8 @@ The Create3 webserver allows you to access and modify settings that pertain to t
 ### Quick Launch Nodes
 Motor Control/Teleop Node
 ```bash
-ros2 run my_teleop_pkg teleop_twist_keyboard --ros-args -p robot_namespace:robot1
+ros2 run my_teleop_pkg teleop_twist_keyboard --ros-args -p robot_namespace:=robot1
+ros2 run my_teleop_pkg teleop_twist_keyboard --ros-args -p robot_namespace:=robot2
 ```
 YOLO person tracker Node
 ```bash
