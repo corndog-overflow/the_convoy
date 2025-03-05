@@ -102,7 +102,7 @@ handle all 3 steps by running bash script initNav.sh:
 ```
 add 
 ```bash
-namespace:=/robot1 for the intended robot
+namespace:=/robot1
 ```
 at the end of any command to specify a robot
 ### Start robot with bash script launch_robot.sh:
