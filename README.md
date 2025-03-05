@@ -46,8 +46,13 @@ and look out to see if all the /oakd topics are online. This is a good sign
 ### How To SSH into our Turtlebot:
 1. Make sure robot is on
 2. Open terminal and type in:
+Bot 1 
 ```bash
 ssh ubuntu@192.168.1.208
+```
+Bot 2
+```bash
+ssh ubuntu@192.168.1.160
 ```
 3. Should just work. Password is: ```turtlebot4```
 
@@ -72,6 +77,10 @@ Color detection Node
 ```bash
 ros2 run color_detection color_detection_node
 ```
+Path Planning Node
+```bash
+ros2 run my_pathplanner path_planner
+```
 
 ### How to use Nav2 with SLAM and Rviz:
 1. Run synchronous SLAM:
@@ -86,9 +95,16 @@ ros2 launch turtlebot4_navigation nav2.launch.py
 ```bash
 ros2 launch turtlebot4_viz view_navigation.launch.py
 ```
-4. Make sure to set pose correctly.
-5. Use set goal to make robot go.
-
+OR
+handle all 3 steps by running bash script initNav.sh:
+```bash
+./initNav.sh
+```
+add 
+```bash
+namespace:=/robot1
+```
+at the end of any command to specify a robot
 ### Start robot with bash script launch_robot.sh:
 ```bash
 cd ~/ros2_ws
