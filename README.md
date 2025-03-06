@@ -21,12 +21,21 @@ https://turtlebot.github.io/turtlebot4-user-manual/
 
 ### Terminal Environment Setup:
 Whenever you open a new terminal window, paste all of this in:
+For Bot 1:
 ```bash
 cd ~/ros2_ws
 source /opt/ros/jazzy/setup.bash
 source install/setup.bash
 export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
 export ROS_DOMAIN_ID=0
+```
+For Bot 2:
+```bash
+cd ~/ros2_ws
+source /opt/ros/jazzy/setup.bash
+source install/setup.bash
+export RMW_IMPLEMENTATION=rmw_fastrtps_cpp
+export ROS_DOMAIN_ID=1
 ```
 
 ### Turtlebot Startup/Restart Procedure:
@@ -59,9 +68,13 @@ ssh ubuntu@192.168.1.160
 ### How to access Create® 3 webserver:
 The Create3 webserver allows you to access and modify settings that pertain to the Create3 computer on the Turtlebot.
 
-1. Open web browser and enter this url for robot1 and robot2 respectively: 
+1. Open web browser and enter this url for robot1 and robot2 respectively:
+Bot 1
 ```
 192.168.1.208:8080
+```
+Bot 2
+```
 192.168.1.160:8080
 ```
 
@@ -102,9 +115,6 @@ handle all 3 steps by running bash script initNav.sh:
 ./initNav.sh
 ```
 add 
-```bash
-namespace:=/robot1
-```
 at the end of any command to specify a robot
 ### Start robot with bash script launch_robot.sh:
 ```bash
@@ -112,75 +122,3 @@ cd ~/ros2_ws
 chmod +x launch_robot.sh
 ./launch_robot.sh
 ```
-
-ros2 launch turtlebot4_navigation slam.launch.py namespace:=robot2 \
-  use_namespace:=true \
-  slam_params_file:=~/robot2_slam_params.yaml \
-  remap:=/tf:=/robot2/tf \
-  remap:=/tf_static:=/robot2/tf_static \
-  remap:=/scan:=/robot2/scan \
-  remap:=/odom:=/robot2/odom
-
-ros2 launch turtlebot4_navigation nav2.launch.py namespace:=robot2
-
-ros2 launch turtlebot4_viz view_navigation.launch.py namespace:=robot2
-
-slam_toolbox:
-  ros__parameters:
-    # Plugin params
-    solver_plugin: solver_plugins::CeresSolver
-    ceres_linear_solver: SPARSE_NORMAL_CHOLESKY
-    ceres_preconditioner: SCHUR_JACOBI
-    ceres_trust_strategy: LEVENBERG_MARQUARDT
-    ceres_dogleg_type: TRADITIONAL_DOGLEG
-    ceres_loss_function: None
-    # ROS Parameters
-    odom_frame: robot2/odom
-    map_frame: map
-    base_frame: robot2/base_link
-    scan_topic: /robot2/scan
-    use_map_saver: true
-    mode: mapping
-    debug_logging: false
-    throttle_scans: 1
-    transform_publish_period: 0.02
-    map_update_interval: 1.0
-    resolution: 0.05
-    max_laser_range: 12.0
-    minimum_time_interval: 0.5
-    transform_timeout: 0.2
-    tf_buffer_duration: 30.
-    stack_size_to_use: 40000000
-    enable_interactive_mode: true
-    # General Parameters
-    use_scan_matching: true
-    use_scan_barycenter: true
-    minimum_travel_distance: 0.1
-    minimum_travel_heading: 0.1
-    scan_buffer_size: 10
-    scan_buffer_maximum_scan_distance: 10.0
-    link_match_minimum_response_fine: 0.1
-    link_scan_maximum_distance: 1.5
-    loop_search_maximum_distance: 3.0
-    do_loop_closing: true
-    loop_match_minimum_chain_size: 10
-    loop_match_maximum_variance_coarse: 3.0
-    loop_match_minimum_response_coarse: 0.35
-    loop_match_minimum_response_fine: 0.45
-    # Correlation Parameters - Correlation Parameters
-    correlation_search_space_dimension: 0.5
-    correlation_search_space_resolution: 0.01
-    correlation_search_space_smear_deviation: 0.1
-    # Correlation Parameters - Loop Closure Parameters
-    loop_search_space_dimension: 8.0
-    loop_search_space_resolution: 0.05
-    loop_search_space_smear_deviation: 0.03
-    # Scan Matcher Parameters
-    distance_variance_penalty: 0.5
-    angle_variance_penalty: 1.0
-    fine_search_angle_offset: 0.00349
-    coarse_search_angle_offset: 0.349
-    coarse_angle_resolution: 0.0349
-    minimum_angle_penalty: 0.9
-    minimum_distance_penalty: 0.5
-    use_response_expansion: true
