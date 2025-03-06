@@ -1,13 +1,13 @@
-#include <atomic>
-#include <geometry_msgs/msg/twist_stamped.hpp>
-#include <iostream>
-#include <map>
 #include <rclcpp/rclcpp.hpp>
+#include <geometry_msgs/msg/twist_stamped.hpp>
 #include <std_msgs/msg/float64.hpp>
 #include <termios.h>
-#include <thread>
-#include <tuple>
 #include <unistd.h>
+#include <map>
+#include <tuple>
+#include <iostream>
+#include <thread>
+#include <atomic>
 
 // Help message displayed to users showing keyboard controls
 const char *usage_msg = R"(
@@ -31,26 +31,24 @@ CTRL-C to quit
 )";
 
 // Map keyboard keys to linear (x) and angular (z) velocity values
-std::map<char, std::tuple<float, float>> moveBindings{{'i', {1, 0}}, {'o', {1, -1}}, {'j', {0, 1}},  {'l', {0, -1}},
-                                                      {'u', {1, 1}}, {',', {-1, 0}}, {'.', {-1, 1}}, {'m', {-1, -1}}};
+std::map<char, std::tuple<float, float>> moveBindings{
+    {'i', {1, 0}}, {'o', {1, -1}}, {'j', {0, 1}}, {'l', {0, -1}}, {'u', {1, 1}}, {',', {-1, 0}}, {'.', {-1, 1}}, {'m', {-1, -1}}};
 
 // Map keyboard keys to speed multiplier values
-std::map<char, std::tuple<float, float>> speedBindings{{'q', {1.1, 1.1}}, {'z', {0.9, 0.9}}, {'w', {1.1, 1}},
-                                                       {'x', {0.9, 1}},   {'e', {1, 1.1}},   {'c', {1, 0.9}}};
+std::map<char, std::tuple<float, float>> speedBindings{
+    {'q', {1.1, 1.1}}, {'z', {0.9, 0.9}}, {'w', {1.1, 1}}, {'x', {0.9, 1}}, {'e', {1, 1.1}}, {'c', {1, 0.9}}};
 
 // Helper struct to manage terminal settings
-struct TerminalSettings {
+struct TerminalSettings
+{
     termios original;
-    void save() {
-        tcgetattr(STDIN_FILENO, &original);
-    }
-    void restore() {
-        tcsetattr(STDIN_FILENO, TCSANOW, &original);
-    }
+    void save() { tcgetattr(STDIN_FILENO, &original); }
+    void restore() { tcsetattr(STDIN_FILENO, TCSANOW, &original); }
 };
 
 // Read a single keypress from terminal without waiting for Enter
-char getKey() {
+char getKey()
+{
     struct termios t;
     tcgetattr(STDIN_FILENO, &t);
     t.c_lflag &= ~(ICANON | ECHO);
@@ -61,15 +59,19 @@ char getKey() {
 }
 
 // Display current robot status including speed, turn rate, and person tracking info
-void printStatus(float speed, float turn, float angle, float distance, const std::string &robot_namespace) {
-    std::cout << "\rNamespace: " << robot_namespace << " | Speed: " << speed << " | Turn: " << turn
+void printStatus(float speed, float turn, float angle, float distance)
+{
+    std::cout << "\rSpeed: " << speed
+              << " | Turn: " << turn
               << " | Angle: " << angle << " degrees"
-              << " | Distance: " << distance << "       " << std::flush;
+              << " | Distance: " << distance << "       "
+              << std::flush;
 }
 
 // PID controller implementation for smooth motion control
-class PIDController {
-  private:
+class PIDController
+{
+private:
     double kp_, ki_, kd_;            // PID gains
     double integral_ = 0.0;          // Integral term accumulator
     double prev_error_ = 0.0;        // Previous error for derivative calculation
@@ -77,16 +79,17 @@ class PIDController {
     std::chrono::steady_clock::time_point prev_time_;
     bool first_run_ = true;
 
-  public:
+public:
     // Constructor to initialize PID parameters and limits
     PIDController(double kp, double ki, double kd, double output_min, double output_max)
-        : kp_(kp), ki_(ki), kd_(kd), output_min_(output_min), output_max_(output_max) {
-    }
+        : kp_(kp), ki_(ki), kd_(kd), output_min_(output_min), output_max_(output_max) {}
 
     // Calculate PID control output based on error
-    double compute(double error) {
+    double compute(double error)
+    {
         auto current_time = std::chrono::steady_clock::now();
-        if (first_run_) {
+        if (first_run_)
+        {
             prev_time_ = current_time;
             first_run_ = false;
             return 0.0;
@@ -111,7 +114,8 @@ class PIDController {
     }
 
     // Reset controller state
-    void reset() {
+    void reset()
+    {
         integral_ = 0.0;
         prev_error_ = 0.0;
         first_run_ = true;
@@ -119,9 +123,11 @@ class PIDController {
 };
 
 // Function to handle person tracking behavior
-void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub, float &person_angle,
-                 float &person_distance, float target_distance, rclcpp::Node::SharedPtr node,
-                 std::atomic<bool> &tracking) {
+void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub,
+                 float &person_angle, float &person_distance,
+                 float target_distance, rclcpp::Node::SharedPtr node,
+                 std::atomic<bool> &tracking)
+{
     PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5);
     PIDController linear_pid(0.5, 0.0, 0.2, -0.5, 0.5);
     geometry_msgs::msg::TwistStamped cmd_msg;
@@ -129,7 +135,8 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr 
     double prev_distance = person_distance;
     const double APPROACH_SPEED_LIMIT = 0.3;
 
-    while (rclcpp::ok() && tracking) {
+    while (rclcpp::ok() && tracking)
+    {
         // Calculate errors for PID controllers
         double angular_error = person_angle;
         double linear_error = person_distance - target_distance;
@@ -146,7 +153,8 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr 
         cmd_msg.twist.linear.x = std::clamp(pid_output, -max_speed, max_speed);
 
         // Safety check: stop if approaching too fast when close
-        if (approach_velocity > 0.5 && distance_to_target < 1.0) {
+        if (approach_velocity > 0.5 && distance_to_target < 1.0)
+        {
             cmd_msg.twist.linear.x = 0.0;
             linear_pid.reset();
         }
@@ -170,100 +178,86 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr 
     RCLCPP_INFO(node->get_logger(), "Stopped tracking.");
 }
 
-int main(int argc, char **argv) {
+int main(int argc, char **argv)
+{
     // Initialize ROS2 node
     rclcpp::init(argc, argv);
-
-    // Create node options to allow for arguments
-    rclcpp::NodeOptions options;
-    options.allow_undeclared_parameters(true);
-    options.automatically_declare_parameters_from_overrides(true);
-
-    // Create node with options
-    auto node = rclcpp::Node::make_shared("teleop_twist_keyboard", options);
-
-    // Get robot namespace from parameter (default to empty string if not specified)
-    std::string robot_namespace = "";
-    node->get_parameter_or("robot_namespace", robot_namespace, robot_namespace);
-
-    // Create the cmd_vel topic with proper namespace if specified
-    std::string cmd_vel_topic = "cmd_vel";
-    if (!robot_namespace.empty()) {
-        if (robot_namespace.back() != '/') {
-            robot_namespace += '/';
-        }
-        cmd_vel_topic = robot_namespace + cmd_vel_topic;
-    }
-
-    RCLCPP_INFO(node->get_logger(), "Publishing to %s", cmd_vel_topic.c_str());
-
-    // Create publisher with the appropriate topic
-    auto pub_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>(cmd_vel_topic, 10);
+    auto node = rclcpp::Node::make_shared("teleop_twist_keyboard");
+    auto pub_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel", 10);
 
     // Initialize control variables
     float speed = 1.0, turn = 1.0;
     float person_angle = 0.0, person_distance = -1.0;
     std::atomic<bool> tracking{false};
 
-    // Subscribe to person tracking topics - consider using the same namespace for these
-    std::string angle_topic = "person_angle";
-    std::string distance_topic = "person_distance";
-
-    if (!robot_namespace.empty()) {
-        angle_topic = robot_namespace + angle_topic;
-        distance_topic = robot_namespace + distance_topic;
-    }
-
+    // Subscribe to person tracking topics
     auto sub_angle = node->create_subscription<std_msgs::msg::Float64>(
-        angle_topic, 10, [&person_angle](std_msgs::msg::Float64::SharedPtr msg) { person_angle = msg->data; });
+        "person_angle", 10,
+        [&person_angle](std_msgs::msg::Float64::SharedPtr msg)
+        {
+            person_angle = msg->data;
+        });
 
     auto sub_distance = node->create_subscription<std_msgs::msg::Float64>(
-        distance_topic, 10, [&person_distance](std_msgs::msg::Float64::SharedPtr msg) { person_distance = msg->data; });
+        "person_distance", 10,
+        [&person_distance](std_msgs::msg::Float64::SharedPtr msg)
+        {
+            person_distance = msg->data;
+        });
 
     // Create timer for status updates
-    auto timer = node->create_wall_timer(std::chrono::milliseconds(100), [&]() {
-        printStatus(speed, turn, person_angle, person_distance, robot_namespace.empty() ? "default" : robot_namespace);
-    });
+    auto timer = node->create_wall_timer(
+        std::chrono::milliseconds(100),
+        [&]()
+        { printStatus(speed, turn, person_angle, person_distance); });
 
     // Start ROS2 spin thread
-    std::thread spin_thread([&]() { rclcpp::spin(node); });
+    std::thread spin_thread([&]()
+                            { rclcpp::spin(node); });
 
     // Setup terminal for keyboard input
     TerminalSettings terminal;
     terminal.save();
 
-    try {
+    try
+    {
         std::cout << usage_msg;
-        std::cout << "Publishing to: " << cmd_vel_topic << std::endl;
 
         // Main control loop
-        while (rclcpp::ok()) {
+        while (rclcpp::ok())
+        {
             char key = getKey();
             float x = 0, th = 0;
 
             // Handle movement commands
-            if (moveBindings.count(key)) {
+            if (moveBindings.count(key))
+            {
                 std::tie(x, th) = moveBindings[key];
             }
             // Handle speed adjustment commands
-            else if (speedBindings.count(key)) {
+            else if (speedBindings.count(key))
+            {
                 auto [speed_mult, turn_mult] = speedBindings[key];
                 speed *= speed_mult;
                 turn *= turn_mult;
                 continue;
             }
             // Toggle person tracking
-            else if (key == 'P' || key == 'p') {
+            else if (key == 'P' || key == 'p')
+            {
                 tracking = !tracking;
-                if (tracking) {
-                    std::thread(trackPerson, pub_twist, std::ref(person_angle), std::ref(person_distance), 2.0, node,
+                if (tracking)
+                {
+                    std::thread(trackPerson, pub_twist, std::ref(person_angle),
+                                std::ref(person_distance), 2.0, node,
                                 std::ref(tracking))
                         .detach();
                 }
                 continue;
             }
             // Exit on Ctrl-C
-            else if (key == '\x03') {
+            else if (key == '\x03')
+            {
                 break;
             }
 
@@ -275,7 +269,9 @@ int main(int argc, char **argv) {
             msg.twist.angular.z = th * turn;
             pub_twist->publish(msg);
         }
-    } catch (const std::exception &ex) {
+    }
+    catch (const std::exception &ex)
+    {
         std::cerr << ex.what() << std::endl;
     }
 
