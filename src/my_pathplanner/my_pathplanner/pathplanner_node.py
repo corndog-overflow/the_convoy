@@ -2,7 +2,7 @@
 import rclpy
 import math
 from rclpy.node import Node
-from std_msgs.msg import Float64  # Added missing import
+from std_msgs.msg import Float64
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
 
 class PathPlannerNode(Node):
@@ -60,10 +60,7 @@ class PathPlannerNode(Node):
             self.start_navigation()
     
     def start_navigation(self):
-        # Set initial pose
-        initial_pose = self.navigator.getPoseStamped([0.0, 0.0], TurtleBot4Directions.NORTH)
         print("TESTING4")
-        #self.navigator.setInitialPose(initial_pose) SLAM Handles this
         print("TESTING5")
         
         # Wait for Nav2
@@ -75,22 +72,19 @@ class PathPlannerNode(Node):
         y = self.person_distance * math.sin(math.radians(self.person_angle))
         print(f"Target coordinates: x={x}, y={y}")
         
-        # Set goal pose using the calculated x and y values
+        # Set goal pose using the calculated x and y values with base_link frame
         goal_pose = self.navigator.getPoseStamped([x, y], TurtleBot4Directions.NORTH)
-        print("TESTING6")
+        # Set the frame explicitly to base_link
+        goal_pose.header.frame_id = 'base_link'
         
+        print("TESTING6")
         print("TESTING7")
-        # Optional: Uncomment if you need docking/undocking
-        # if not self.navigator.getDockedStatus():
-        #     self.get_logger().info('Docking before initializing pose')
-        #     self.navigator.dock()
-        #     self.navigator.undock()
         
         # Go to goal pose
-        self.get_logger().info(f'Starting navigation to goal at x={x}, y={y}')
+        self.get_logger().info(f'Starting navigation to goal at x={x}, y={y} in base_link frame')
         self.navigator.startToPose(goal_pose)
         
-        # Optional: Wait for navigation to complete
+        # Wait for navigation to complete
         while not self.navigator.isTaskComplete():
             feedback = self.navigator.getFeedback()
             if feedback:
