@@ -185,28 +185,7 @@ class YOLOPersonDetector(Node):
     def publish_annotated_frame(self, frame):
         image_message = self.bridge.cv2_to_imgmsg(frame, encoding="bgr8")
         self.image_pub.publish(image_message)
-<<<<<<< HEAD
-        
-        # Create a guaranteed unique window name based on node name and namespace
-        node_id = self.get_name() + '_' + str(id(self))  # Use the object's memory address for uniqueness
-        window_name = f"YOLO_Detection_{self.robot_namespace}_{node_id}" if self.robot_namespace else f"YOLO_Detection_{node_id}"
-        
-        # Track this window name for proper cleanup
-        if window_name not in self.window_names:
-            self.window_names.append(window_name)
-        
-        # Set window position based on namespace to avoid overlapping windows
-        if self.robot_namespace == 'robot1':
-            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-            cv2.moveWindow(window_name, 50, 50)  # Position for robot1 window
-        elif self.robot_namespace == 'robot2':
-            cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
-            cv2.moveWindow(window_name, 700, 50)  # Position for robot2 window
-        
-        cv2.imshow(window_name, frame)
-=======
         cv2.imshow("YOLO Detection", frame)
->>>>>>> parent of 5e40865 (namespace for yolo)
         cv2.waitKey(1)
 
     def destroy_node(self):
