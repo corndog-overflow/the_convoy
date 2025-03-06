@@ -36,26 +36,47 @@ class PathPlannerNode(Node):
             10                # Queue size
         )
         
+        # Create loggers for angle and distance data
+        self.create_timer(0.5, self.log_data)
+        
         # Create a timer to start navigation after node is fully initialized and data is received
         self.timer = self.create_timer(1.0, self.check_data)
         print("TESTING3")
         self.get_logger().info('Path Planner Node initialized')
     
+    def log_data(self):
+        """Log the current angle and distance data."""
+        status_angle = "Received" if self.received_angle else "Waiting for"
+        status_distance = "Received" if self.received_distance else "Waiting for"
+        
+        self.get_logger().info('=' * 50)
+        self.get_logger().info(f"SENSOR DATA STATUS:")
+        self.get_logger().info(f"{status_angle} angle data: {self.person_angle:.2f} degrees")
+        self.get_logger().info(f"{status_distance} distance data: {self.person_distance:.2f} meters")
+        self.get_logger().info('=' * 50)
+    
     def angle_callback(self, msg):
         """Callback function for person_angle topic."""
+        previous_angle = self.person_angle
         self.person_angle = msg.data  # Store the received angle value
         self.received_angle = True
-        self.get_logger().info(f"Received person angle: {self.person_angle}")
+        
+        # Log the change in angle
+        self.get_logger().info(f"ANGLE UPDATE: {previous_angle:.2f}° → {self.person_angle:.2f}° (change: {self.person_angle - previous_angle:.2f}°)")
     
     def distance_callback(self, msg):
         """Callback function for person_distance topic."""
+        previous_distance = self.person_distance
         self.person_distance = msg.data  # Store the received distance value
         self.received_distance = True
-        self.get_logger().info(f"Received person distance: {self.person_distance}")
+        
+        # Log the change in distance
+        self.get_logger().info(f"DISTANCE UPDATE: {previous_distance:.2f}m → {self.person_distance:.2f}m (change: {self.person_distance - previous_distance:.2f}m)")
     
     def check_data(self):
         """Check if we have received both angle and distance data."""
         if self.received_angle and self.received_distance:
+            self.get_logger().info("READY: Both angle and distance data received. Starting navigation...")
             self.destroy_timer(self.timer)
             self.start_navigation()
     
@@ -64,13 +85,21 @@ class PathPlannerNode(Node):
         print("TESTING5")
         
         # Wait for Nav2
+        self.get_logger().info("Waiting for Nav2 to become active...")
         self.navigator.waitUntilNav2Active(navigator='bt_navigator', localizer='slam_toolbox')
+        self.get_logger().info("Nav2 is now active!")
         
         print("testing print")
         # Polar-to-Cartesian conversion for x and y
         x = self.person_distance * math.cos(math.radians(self.person_angle))
         y = self.person_distance * math.sin(math.radians(self.person_angle))
-        print(f"Target coordinates: x={x}, y={y}")
+        
+        self.get_logger().info('=' * 50)
+        self.get_logger().info("NAVIGATION CALCULATION:")
+        self.get_logger().info(f"Input angle: {self.person_angle:.2f}° ({math.radians(self.person_angle):.2f} radians)")
+        self.get_logger().info(f"Input distance: {self.person_distance:.2f} meters")
+        self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
+        self.get_logger().info('=' * 50)
         
         # Set goal pose using the calculated x and y values with base_link frame
         goal_pose = self.navigator.getPoseStamped([x, y], TurtleBot4Directions.NORTH)
@@ -81,16 +110,17 @@ class PathPlannerNode(Node):
         print("TESTING7")
         
         # Go to goal pose
-        self.get_logger().info(f'Starting navigation to goal at x={x}, y={y} in base_link frame')
+        self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m in base_link frame')
         self.navigator.startToPose(goal_pose)
         
         # Wait for navigation to complete
+        self.get_logger().info("Navigation in progress, monitoring for completion...")
         while not self.navigator.isTaskComplete():
             feedback = self.navigator.getFeedback()
             if feedback:
-                self.get_logger().info(f'Navigation feedback: {feedback}')
+                self.get_logger().info(f'FEEDBACK: {feedback}')
         
-        self.get_logger().info('Navigation completed')
+        self.get_logger().info('NAVIGATION COMPLETED SUCCESSFULLY')
 
 def main(args=None):
     rclpy.init(args=args)
