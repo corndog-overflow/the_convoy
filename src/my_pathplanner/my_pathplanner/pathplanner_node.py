@@ -3,7 +3,8 @@ import rclpy
 import math
 from rclpy.node import Node
 from std_msgs.msg import Float64
-from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Directions, TurtleBot4Navigator
+from geometry_msgs.msg import PoseStamped, Quaternion
+from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Navigator
 
 class PathPlannerNode(Node):
     def __init__(self):
@@ -99,18 +100,28 @@ class PathPlannerNode(Node):
         self.get_logger().info(f"Input angle: {self.person_angle:.2f}° ({math.radians(self.person_angle):.2f} radians)")
         self.get_logger().info(f"Input distance: {self.person_distance:.2f} meters")
         self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
+        self.get_logger().info("Maintaining current robot heading")
         self.get_logger().info('=' * 50)
         
-        # Set goal pose using the calculated x and y values with base_link frame
-        goal_pose = self.navigator.getPoseStamped([x, y], TurtleBot4Directions.NORTH)
-        # Set the frame explicitly to base_link
+        # Create a goal pose and set position
+        goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'base_link'
+        goal_pose.header.stamp = self.get_clock().now().to_msg()
+        
+        # Set the position
+        goal_pose.pose.position.x = x
+        goal_pose.pose.position.y = y
+        goal_pose.pose.position.z = 0.0
+        
+        # Set orientation to identity quaternion (no rotation)
+        # This will maintain the current heading since we're using base_link frame
+        goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
         
         print("TESTING6")
         print("TESTING7")
         
         # Go to goal pose
-        self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m in base_link frame')
+        self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m while maintaining current heading')
         self.navigator.startToPose(goal_pose)
         
         # Wait for navigation to complete
