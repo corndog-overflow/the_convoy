@@ -122,3 +122,44 @@ cd ~/ros2_ws
 chmod +x launch_robot.sh
 ./launch_robot.sh
 ```
+
+this turns on stereo camera!!!
+cat /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
+sudo cp ~/oakd_lite.yaml /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
+```
+/oakd:
+  ros__parameters:
+    camera:
+      i_enable_imu: false
+      i_enable_ir: false
+      i_nn_type: none
+      i_pipeline_type: RGBD # Change to RGBD to enable depth
+      i_usb_speed: SUPER_PLUS
+    rgb:
+      i_board_socket_id: 0
+      i_fps: 30.0
+      i_height: 720
+      i_interleaved: false
+      i_max_q_size: 10
+      i_preview_size: 250
+      i_enable_preview: true
+      i_low_bandwidth: true
+      i_keep_preview_aspect_ratio: true
+      i_publish_topic: false
+      i_resolution: '1080'
+      i_width: 1280
+    stereo:
+      i_board_socket_id: 1
+      i_fps: 30.0
+      i_height: 480
+      i_width: 640
+      i_depth_align: true
+      i_subpixel: true
+      i_lr_check: true
+      i_extended: false
+      i_confidence_threshold: 200
+      i_left_right_check_threshold: 5
+      i_enable_preview: true
+      i_publish_topic: true
+    use_sim_time: false
+```
