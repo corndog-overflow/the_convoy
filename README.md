@@ -112,7 +112,11 @@ ros2 launch turtlebot4_viz view_navigation.launch.py
 OR
 handle all 3 steps by running bash script initNav.sh:
 ```bash
-./initNav.sh
+./initNav.sh 
+```
+or 
+```bash
+./initNav.sh 1
 ```
 add 
 at the end of any command to specify a robot
