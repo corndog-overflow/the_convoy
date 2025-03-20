@@ -114,7 +114,7 @@ handle all 3 steps by running bash script initNav.sh:
 ```bash
 ./initNav.sh 
 ```
-or 
+or (for Robot 2)
 ```bash
 ./initNav.sh 1
 ```
