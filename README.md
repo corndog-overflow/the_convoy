@@ -127,6 +127,11 @@ chmod +x launch_robot.sh
 ./launch_robot.sh
 ```
 
+### Instructions on how to enable camera:
+make sure bot is set to lite
+```
+ros2 launch turtlebot4_viz view_model.launch.py
+```
 this turns on stereo camera!!!
 ```
 cat /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
