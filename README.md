@@ -168,8 +168,6 @@ sudo cp ~/oakd_lite.yaml /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lit
       i_confidence_threshold: 200
       i_left_right_check_threshold: 5
       i_enable_preview: true
-      i_output_colorized: true
-      i_colormap: 2
       i_publish_topic: true
     use_sim_time: false
 ```
