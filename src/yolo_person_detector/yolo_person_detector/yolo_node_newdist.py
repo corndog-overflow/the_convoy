@@ -160,7 +160,7 @@ class YOLOPersonDetector(Node):
             results = self.model(frame, stream=True)
             for r in results:
                 for box in r.boxes:
-                    if self.class_names[int(box.cls[0])] == "person":
+                    if self.class_names[int(box.cls[0])] == "backpack":
                         self.process_person_detection(
                             frame, box, frame_width, frame_center_x
                         )
@@ -211,15 +211,15 @@ class YOLOPersonDetector(Node):
         return (offset_x / (frame_width / 2)) * (self.horizontal_fov / 2)
 
     def calculate_distance(self, x1, y1, x2, y2):        
-        return (y2 - y1)
+        return 200/(y2 - y1)
 
     def publish_angle_and_distance(self, angle, distance):
         angle_msg = Float64()
-        angle_msg.data = angle
+        angle_msg.data = float(angle)
         self.angle_pub.publish(angle_msg)
 
         distance_msg = Float64()
-        distance_msg.data = distance
+        distance_msg.data = float(distance)
         self.distance_pub.publish(distance_msg)
 
     def annotate_frame(self, frame, box, angle, distance, x1, y1):
@@ -231,10 +231,10 @@ class YOLOPersonDetector(Node):
         label3 = f"Dist: {distance:.2f}"
     
         # Use a smaller font size and adjust line spacing
-        font_scale = 0.6  # Smaller font size
+        font_scale = 0.75  #Smaller font size
         font = cv2.FONT_HERSHEY_SIMPLEX
-        color = (255, 255, 255)  # White text
-        thickness = 1
+        color = (0, 0, 255)  # red text
+        thickness = 2
     
         # Draw each label on a new line
         cv2.putText(frame, label1, (x1, y1), font, font_scale, color, thickness, lineType=cv2.LINE_AA)
