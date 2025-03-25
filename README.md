@@ -128,8 +128,12 @@ chmod +x launch_robot.sh
 ```
 
 this turns on stereo camera!!!
+```
 cat /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
+```
+```
 sudo cp ~/oakd_lite.yaml /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
+```
 ```
 /oakd:
   ros__parameters:
