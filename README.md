@@ -127,9 +127,18 @@ chmod +x launch_robot.sh
 ./launch_robot.sh
 ```
 
+### Instructions on how to enable camera:
+make sure bot is set to lite
+```
+ros2 launch turtlebot4_viz view_model.launch.py
+```
 this turns on stereo camera!!!
+```
 cat /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
+```
+```
 sudo cp ~/oakd_lite.yaml /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
+```
 ```
 /oakd:
   ros__parameters:
@@ -137,7 +146,7 @@ sudo cp ~/oakd_lite.yaml /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lit
       i_enable_imu: false
       i_enable_ir: false
       i_nn_type: none
-      i_pipeline_type: RGBD # Change to RGBD to enable depth
+      i_pipeline_type: RGBD
       i_usb_speed: SUPER_PLUS
     rgb:
       i_board_socket_id: 0
