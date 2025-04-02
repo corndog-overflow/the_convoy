@@ -16,7 +16,6 @@ class PathPlannerNode(Node):
         self.person_distance = 0.0
         self.received_angle = False
         self.received_distance = False
-        
         # Create navigator
         self.navigator = TurtleBot4Navigator()
         print("TESTING2")
@@ -44,7 +43,7 @@ class PathPlannerNode(Node):
         self.timer = self.create_timer(1.0, self.check_data)
         print("TESTING3")
         self.get_logger().info('Path Planner Node initialized')
-    
+
     def log_data(self):
         """Log the current angle and distance data."""
         status_angle = "Received" if self.received_angle else "Waiting for"
@@ -90,11 +89,18 @@ class PathPlannerNode(Node):
         self.navigator.waitUntilNav2Active(navigator='bt_navigator', localizer='slam_toolbox')
         self.get_logger().info("Nav2 is now active!")
         
-        print("testing print")
         # Polar-to-Cartesian conversion for x and y
-        x = self.person_distance * math.cos(math.radians(self.person_angle))
-        y = self.person_distance * math.sin(math.radians(self.person_angle))
-        
+        y = ((self.person_distance-98.514)/(-3.0699))/3.28084 * math.sin(self.person_angle)
+        x = ((self.person_distance-98.514)/(-3.0699))/3.28084 * math.cos(self.person_angle)
+        print(self.person_angle)
+        print("X VALUE:**************************************************************")
+        print(x)
+        print(math.cos(self.person_angle))
+        print("Y VALUE:**************************************************************")
+        print(y)
+        print(math.sin(self.person_angle))
+
+
         self.get_logger().info('=' * 50)
         self.get_logger().info("NAVIGATION CALCULATION:")
         self.get_logger().info(f"Input angle: {self.person_angle:.2f}° ({math.radians(self.person_angle):.2f} radians)")
@@ -102,10 +108,9 @@ class PathPlannerNode(Node):
         self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
         self.get_logger().info("Maintaining current robot heading")
         self.get_logger().info('=' * 50)
-        
         # Create a goal pose and set position
         goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'base_link'
+        goal_pose.header.frame_id = 'base_link' # not working, 0,0 is where we turn on ros2 originally
         goal_pose.header.stamp = self.get_clock().now().to_msg()
         
         # Set the position
