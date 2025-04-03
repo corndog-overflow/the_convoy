@@ -102,7 +102,7 @@ class PathPlannerNode(Node):
         self.navigate_to_person()
         
     def navigate_to_person(self):
-        """Navigate to the person's current position."""
+        """Navigate to the person's current position with latest sensor data."""
         # Calculate new x and y coordinates based on latest sensor data
         x = ((self.person_distance-98.514)/(-3.0699))/3.28084
         y = math.tan(math.radians(self.person_angle)) * -x
@@ -117,7 +117,6 @@ class PathPlannerNode(Node):
         self.get_logger().info(f"Input angle: {self.person_angle:.2f}° ({math.radians(self.person_angle):.2f} radians)")
         self.get_logger().info(f"Input distance: {self.person_distance:.2f} meters")
         self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
-        self.get_logger().info("Maintaining current robot heading")
         self.get_logger().info('=' * 50)
         
         # Create a goal pose and set position
@@ -133,15 +132,9 @@ class PathPlannerNode(Node):
         # Set orientation to identity quaternion (no rotation)
         goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
         
-        # Update goal pose - if it's the first time, start navigation; otherwise, update the existing goal
-        if not hasattr(self, 'navigation_started') or not self.navigation_started:
-            self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m while maintaining current heading')
-            self.navigator.startToPose(goal_pose)
-            self.navigation_started = True
-        else:
-            self.get_logger().info(f'UPDATING NAVIGATION GOAL: New target at x={x:.2f}m, y={y:.2f}m')
-            # Replace the current goal with the new goal
-            self.navigator.goToPose(goal_pose)
+        # Send the goal pose - we don't care about previous goal status
+        self.get_logger().info(f'SENDING NEW GOAL: x={x:.2f}m, y={y:.2f}m')
+        self.navigator.goToPose(goal_pose)
 
 def main(args=None):
     rclpy.init(args=args)
