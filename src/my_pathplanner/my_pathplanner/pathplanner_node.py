@@ -16,6 +16,7 @@ class PathPlannerNode(Node):
         self.person_distance = 0.0
         self.received_angle = False
         self.received_distance = False
+        
         # Create navigator
         self.navigator = TurtleBot4Navigator()
         print("TESTING2")
@@ -40,7 +41,11 @@ class PathPlannerNode(Node):
         self.create_timer(0.5, self.log_data)
         
         # Create a timer to start navigation after node is fully initialized and data is received
-        self.timer = self.create_timer(1.0, self.check_data)
+        self.init_timer = self.create_timer(1.0, self.check_data)
+        
+        # Timer for continuous navigation (will be activated later)
+        self.navigation_timer = None
+        
         print("TESTING3")
         self.get_logger().info('Path Planner Node initialized')
 
@@ -71,22 +76,17 @@ class PathPlannerNode(Node):
         self.received_distance = True
         
         # Log the change in distance
-        # x = ((self.person_distance-98.514)/(-3.0699))/3.28084
-        # y = math.tan(math.radians(self.person_angle)) * x
-        # print("X VALUE:**************************************************************")
-        # print(x)
-        # print("Y VALUE:**************************************************************")
-        # print(y)
         self.get_logger().info(f"DISTANCE UPDATE: {previous_distance:.2f}m → {self.person_distance:.2f}m (change: {self.person_distance - previous_distance:.2f}m)")
     
     def check_data(self):
         """Check if we have received both angle and distance data."""
         if self.received_angle and self.received_distance:
             self.get_logger().info("READY: Both angle and distance data received. Starting navigation...")
-            self.destroy_timer(self.timer)
-            self.start_navigation()
+            self.destroy_timer(self.init_timer)
+            self.initialize_navigation()
     
-    def start_navigation(self):
+    def initialize_navigation(self):
+        """Initialize navigation and set up continuous navigation timer."""
         print("TESTING4")
         print("TESTING5")
         
@@ -95,15 +95,26 @@ class PathPlannerNode(Node):
         self.navigator.waitUntilNav2Active(navigator='bt_navigator', localizer='slam_toolbox')
         self.get_logger().info("Nav2 is now active!")
         
+        # Set up the timer for continuous navigation (every 5 seconds)
+        self.navigation_timer = self.create_timer(5.0, self.navigate_to_person)
+        
+        # Start the first navigation
+        self.navigate_to_person()
+        
+    def navigate_to_person(self):
+        """Navigate to the person's current position."""
+        # Always cancel the previous navigation task before starting a new one
+        self.navigator.cancelTask()
+        self.get_logger().info("Updating navigation goal with current position data...")
+        
         # Polar-to-Cartesian conversion for x and y
-
         x = ((self.person_distance-98.514)/(-3.0699))/3.28084
         y = math.tan(math.radians(self.person_angle)) * -x
+        
         print("X VALUE:**************************************************************")
         print(x)
         print("Y VALUE:**************************************************************")
         print(y)
-
 
         self.get_logger().info('=' * 50)
         self.get_logger().info("NAVIGATION CALCULATION:")
@@ -112,35 +123,23 @@ class PathPlannerNode(Node):
         self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
         self.get_logger().info("Maintaining current robot heading")
         self.get_logger().info('=' * 50)
+        
         # Create a goal pose and set position
         goal_pose = PoseStamped()
-        goal_pose.header.frame_id = 'base_link' # not working, 0,0 is where we turn on ros2 originally
+        goal_pose.header.frame_id = 'base_link'
         goal_pose.header.stamp = self.get_clock().now().to_msg()
         
         # Set the position
-        goal_pose.pose.position.x = x #(x - 2*math.cos(self.person_angle)) # this trig should stop the bot 2 meters from the goal
-        goal_pose.pose.position.y = y #(y - 2*math.sin(self.person_angle))
+        goal_pose.pose.position.x = x
+        goal_pose.pose.position.y = y
         goal_pose.pose.position.z = 0.0
         
         # Set orientation to identity quaternion (no rotation)
-        # This will maintain the current heading since we're using base_link frame
         goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
-        
-        print("TESTING6")
-        print("TESTING7")
         
         # Go to goal pose
         self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m while maintaining current heading')
         self.navigator.startToPose(goal_pose)
-        
-        # Wait for navigation to complete
-        self.get_logger().info("Navigation in progress, monitoring for completion...")
-        while not self.navigator.isTaskComplete():
-            feedback = self.navigator.getFeedback()
-            if feedback:
-                self.get_logger().info(f'FEEDBACK: {feedback}')
-        
-        self.get_logger().info('NAVIGATION COMPLETED SUCCESSFULLY')
 
 def main(args=None):
     rclpy.init(args=args)
