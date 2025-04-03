@@ -17,6 +17,11 @@ class PathPlannerNode(Node):
         self.received_angle = False
         self.received_distance = False
         
+        # Initialize variables to store last valid position
+        self.last_valid_angle = 0.0
+        self.last_valid_distance = 0.0
+        self.has_valid_position = False
+        
         # Create navigator
         self.navigator = TurtleBot4Navigator()
         print("TESTING2")
@@ -68,6 +73,10 @@ class PathPlannerNode(Node):
         
         # Log the change in angle
         self.get_logger().info(f"ANGLE UPDATE: {previous_angle:.2f}° → {self.person_angle:.2f}° (change: {self.person_angle - previous_angle:.2f}°)")
+        
+        # Record last non-zero angle
+        if abs(self.person_angle) > 0.001:  # Use small threshold to account for floating point precision
+            self.last_valid_angle = self.person_angle
     
     def distance_callback(self, msg):
         """Callback function for person_distance topic."""
@@ -77,6 +86,10 @@ class PathPlannerNode(Node):
         
         # Log the change in distance
         self.get_logger().info(f"DISTANCE UPDATE: {previous_distance:.2f}m → {self.person_distance:.2f}m (change: {self.person_distance - previous_distance:.2f}m)")
+        
+        # Record last non-zero distance
+        if self.person_distance > 0.001:  # Use small threshold to account for floating point precision
+            self.last_valid_distance = self.person_distance
     
     def check_data(self):
         """Check if we have received both angle and distance data."""
@@ -103,9 +116,27 @@ class PathPlannerNode(Node):
         
     def navigate_to_person(self):
         """Navigate to the person's current position with latest sensor data."""
-        # Calculate new x and y coordinates based on latest sensor data
-        x = ((self.person_distance-98.514)/(-3.0699))/3.28084
-        y = math.tan(math.radians(self.person_angle)) * -x
+        # Check if we have valid sensor data
+        if abs(self.person_angle) < 0.001 and self.person_distance < 0.001:
+            # Person not in frame - use last valid coordinates if available
+            if self.has_valid_position:
+                self.get_logger().warning("Person not in frame. Continuing with last valid position.")
+                angle = self.last_valid_angle
+                distance = self.last_valid_distance
+            else:
+                self.get_logger().warning("Person not in frame and no previous position available. Skipping navigation update.")
+                return
+        else:
+            # Person in frame - use current coordinates
+            angle = self.person_angle
+            distance = self.person_distance
+            self.last_valid_angle = angle
+            self.last_valid_distance = distance
+            self.has_valid_position = True
+        
+        # Calculate x and y coordinates
+        x = ((distance-98.514)/(-3.0699))/3.28084
+        y = math.tan(math.radians(angle)) * -x
         
         print("X VALUE:**************************************************************")
         print(x)
@@ -114,8 +145,8 @@ class PathPlannerNode(Node):
 
         self.get_logger().info('=' * 50)
         self.get_logger().info("NAVIGATION CALCULATION:")
-        self.get_logger().info(f"Input angle: {self.person_angle:.2f}° ({math.radians(self.person_angle):.2f} radians)")
-        self.get_logger().info(f"Input distance: {self.person_distance:.2f} meters")
+        self.get_logger().info(f"Input angle: {angle:.2f}° ({math.radians(angle):.2f} radians)")
+        self.get_logger().info(f"Input distance: {distance:.2f} meters")
         self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
         self.get_logger().info('=' * 50)
         
@@ -132,9 +163,13 @@ class PathPlannerNode(Node):
         # Set orientation to identity quaternion (no rotation)
         goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
         
-        # Send the goal pose - we don't care about previous goal status
-        self.get_logger().info(f'SENDING NEW GOAL: x={x:.2f}m, y={y:.2f}m')
-        self.navigator.goToPose(goal_pose)
+        # Send the goal pose
+        if not self.has_valid_position:
+            self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m')
+            self.navigator.startToPose(goal_pose)
+        else:
+            self.get_logger().info(f'UPDATING GOAL: New target at x={x:.2f}m, y={y:.2f}m')
+            self.navigator.goToPose(goal_pose)
 
 def main(args=None):
     rclpy.init(args=args)
