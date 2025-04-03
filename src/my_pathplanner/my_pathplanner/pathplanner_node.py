@@ -71,12 +71,12 @@ class PathPlannerNode(Node):
         self.received_distance = True
         
         # Log the change in distance
-        x = ((self.person_distance-98.514)/(-3.0699))/3.28084
-        y = math.tan(math.radians(self.person_angle)) * x
-        print("X VALUE:**************************************************************")
-        print(x)
-        print("Y VALUE:**************************************************************")
-        print(y)
+        # x = ((self.person_distance-98.514)/(-3.0699))/3.28084
+        # y = math.tan(math.radians(self.person_angle)) * x
+        # print("X VALUE:**************************************************************")
+        # print(x)
+        # print("Y VALUE:**************************************************************")
+        # print(y)
         self.get_logger().info(f"DISTANCE UPDATE: {previous_distance:.2f}m → {self.person_distance:.2f}m (change: {self.person_distance - previous_distance:.2f}m)")
     
     def check_data(self):
@@ -96,9 +96,9 @@ class PathPlannerNode(Node):
         self.get_logger().info("Nav2 is now active!")
         
         # Polar-to-Cartesian conversion for x and y
-        #y = -((self.person_distance-98.514)/(-3.0699))/3.28084 * math.sin(self.person_angle)
-        y = 0
+
         x = ((self.person_distance-98.514)/(-3.0699))/3.28084
+        y = math.tan(math.radians(self.person_angle)) * -x
         print("X VALUE:**************************************************************")
         print(x)
         print("Y VALUE:**************************************************************")
@@ -131,7 +131,7 @@ class PathPlannerNode(Node):
         
         # Go to goal pose
         self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m while maintaining current heading')
-        # hello world my name is Benself.navigator.startToPose(goal_pose)
+        self.navigator.startToPose(goal_pose)
         
         # Wait for navigation to complete
         self.get_logger().info("Navigation in progress, monitoring for completion...")
