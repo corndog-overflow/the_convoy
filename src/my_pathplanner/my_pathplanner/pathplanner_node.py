@@ -103,11 +103,7 @@ class PathPlannerNode(Node):
         
     def navigate_to_person(self):
         """Navigate to the person's current position."""
-        # Always cancel the previous navigation task before starting a new one
-        self.navigator.cancelTask()
-        self.get_logger().info("Updating navigation goal with current position data...")
-        
-        # Polar-to-Cartesian conversion for x and y
+        # Calculate new x and y coordinates based on latest sensor data
         x = ((self.person_distance-98.514)/(-3.0699))/3.28084
         y = math.tan(math.radians(self.person_angle)) * -x
         
@@ -137,9 +133,15 @@ class PathPlannerNode(Node):
         # Set orientation to identity quaternion (no rotation)
         goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
         
-        # Go to goal pose
-        self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m while maintaining current heading')
-        self.navigator.startToPose(goal_pose)
+        # Update goal pose - if it's the first time, start navigation; otherwise, update the existing goal
+        if not hasattr(self, 'navigation_started') or not self.navigation_started:
+            self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m while maintaining current heading')
+            self.navigator.startToPose(goal_pose)
+            self.navigation_started = True
+        else:
+            self.get_logger().info(f'UPDATING NAVIGATION GOAL: New target at x={x:.2f}m, y={y:.2f}m')
+            # Replace the current goal with the new goal
+            self.navigator.goToPose(goal_pose)
 
 def main(args=None):
     rclpy.init(args=args)
