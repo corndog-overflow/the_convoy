@@ -95,8 +95,8 @@ class PathPlannerNode(Node):
         self.navigator.waitUntilNav2Active(navigator='bt_navigator', localizer='slam_toolbox')
         self.get_logger().info("Nav2 is now active!")
         
-        # Set up the timer for continuous navigation (every 5 seconds)
-        self.navigation_timer = self.create_timer(5.0, self.navigate_to_person)
+        # Set up the timer for continuous navigation (every 1 second)
+        self.navigation_timer = self.create_timer(1.0, self.navigate_to_person)
         
         # Start the first navigation
         self.navigate_to_person()
