@@ -90,8 +90,8 @@ class PathPlannerNode(Node):
         self.get_logger().info("Nav2 is now active!")
         
         # Polar-to-Cartesian conversion for x and y
-        y = ((self.person_distance-98.514)/(-3.0699))/3.28084 * math.sin(self.person_angle)
-        x = ((self.person_distance-98.514)/(-3.0699))/3.28084 * math.cos(self.person_angle)
+        y = -((self.person_distance-98.514)/(-3.0699))/3.28084 * math.sin(self.person_angle)
+        x = abs(((self.person_distance-98.514)/(-3.0699))/3.28084 * math.cos(self.person_angle))
         print(self.person_angle)
         print("X VALUE:**************************************************************")
         print(x)
@@ -114,8 +114,8 @@ class PathPlannerNode(Node):
         goal_pose.header.stamp = self.get_clock().now().to_msg()
         
         # Set the position
-        goal_pose.pose.position.x = x
-        goal_pose.pose.position.y = y
+        goal_pose.pose.position.x = x #(x - 2*math.cos(self.person_angle)) # this trig should stop the bot 2 meters from the goal
+        goal_pose.pose.position.y = y #(y - 2*math.sin(self.person_angle))
         goal_pose.pose.position.z = 0.0
         
         # Set orientation to identity quaternion (no rotation)
@@ -127,7 +127,7 @@ class PathPlannerNode(Node):
         
         # Go to goal pose
         self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m while maintaining current heading')
-        self.navigator.startToPose(goal_pose)
+        # hello world my name is Benself.navigator.startToPose(goal_pose)
         
         # Wait for navigation to complete
         self.get_logger().info("Navigation in progress, monitoring for completion...")
