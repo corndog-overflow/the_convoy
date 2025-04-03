@@ -71,6 +71,12 @@ class PathPlannerNode(Node):
         self.received_distance = True
         
         # Log the change in distance
+        x = ((self.person_distance-98.514)/(-3.0699))/3.28084
+        y = math.tan(math.radians(self.person_angle)) * x
+        print("X VALUE:**************************************************************")
+        print(x)
+        print("Y VALUE:**************************************************************")
+        print(y)
         self.get_logger().info(f"DISTANCE UPDATE: {previous_distance:.2f}m → {self.person_distance:.2f}m (change: {self.person_distance - previous_distance:.2f}m)")
     
     def check_data(self):
@@ -90,15 +96,13 @@ class PathPlannerNode(Node):
         self.get_logger().info("Nav2 is now active!")
         
         # Polar-to-Cartesian conversion for x and y
-        y = -((self.person_distance-98.514)/(-3.0699))/3.28084 * math.sin(self.person_angle)
-        x = abs(((self.person_distance-98.514)/(-3.0699))/3.28084 * math.cos(self.person_angle))
-        print(self.person_angle)
+        #y = -((self.person_distance-98.514)/(-3.0699))/3.28084 * math.sin(self.person_angle)
+        y = 0
+        x = ((self.person_distance-98.514)/(-3.0699))/3.28084
         print("X VALUE:**************************************************************")
         print(x)
-        print(math.cos(self.person_angle))
         print("Y VALUE:**************************************************************")
         print(y)
-        print(math.sin(self.person_angle))
 
 
         self.get_logger().info('=' * 50)
