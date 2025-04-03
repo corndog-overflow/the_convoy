@@ -116,13 +116,16 @@ class PathPlannerNode(Node):
         
     def navigate_to_person(self):
         """Navigate to the person's current position with latest sensor data."""
-        # Check if we have valid sensor data
-        if abs(self.person_angle) < 0.001 and self.person_distance < 0.001:
+        # Check if we have valid sensor data (both angle and distance close to zero)
+        using_last_valid = False
+        
+        if (abs(self.person_angle) < 0.001 and self.person_distance < 0.001):
             # Person not in frame - use last valid coordinates if available
             if self.has_valid_position:
                 self.get_logger().warning("Person not in frame. Continuing with last valid position.")
                 angle = self.last_valid_angle
                 distance = self.last_valid_distance
+                using_last_valid = True
             else:
                 self.get_logger().warning("Person not in frame and no previous position available. Skipping navigation update.")
                 return
@@ -130,6 +133,7 @@ class PathPlannerNode(Node):
             # Person in frame - use current coordinates
             angle = self.person_angle
             distance = self.person_distance
+            # Only update last valid position if we have non-zero values
             self.last_valid_angle = angle
             self.last_valid_distance = distance
             self.has_valid_position = True
@@ -143,8 +147,11 @@ class PathPlannerNode(Node):
         print("Y VALUE:**************************************************************")
         print(y)
 
+        # Display whether we're using last valid position or current position
+        position_status = "USING LAST VALID POSITION" if using_last_valid else "USING CURRENT POSITION"
+        
         self.get_logger().info('=' * 50)
-        self.get_logger().info("NAVIGATION CALCULATION:")
+        self.get_logger().info(f"NAVIGATION CALCULATION: {position_status}")
         self.get_logger().info(f"Input angle: {angle:.2f}° ({math.radians(angle):.2f} radians)")
         self.get_logger().info(f"Input distance: {distance:.2f} meters")
         self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
@@ -163,13 +170,12 @@ class PathPlannerNode(Node):
         # Set orientation to identity quaternion (no rotation)
         goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
         
-        # Send the goal pose
-        if not self.has_valid_position:
-            self.get_logger().info(f'STARTING NAVIGATION: Moving to goal at x={x:.2f}m, y={y:.2f}m')
-            self.navigator.startToPose(goal_pose)
-        else:
-            self.get_logger().info(f'UPDATING GOAL: New target at x={x:.2f}m, y={y:.2f}m')
-            self.navigator.goToPose(goal_pose)
+        # Always use goToPose to update the goal
+        self.get_logger().info(f'UPDATING GOAL: Target at x={x:.2f}m, y={y:.2f}m')
+        
+        # Force path replanning by always using startToPose
+        # This ensures the robot doesn't stop when using the last valid position
+        self.navigator.startToPose(goal_pose)
 
 def main(args=None):
     rclpy.init(args=args)
