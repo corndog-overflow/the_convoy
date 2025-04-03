@@ -1,189 +1,196 @@
-import numpy as np
-import matplotlib.pyplot as plt
 import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+from std_msgs.msg import Float64
 import cv2
-from ultralytics import YOLO  # Assuming you're using the ultralytics YOLO model
+import torch
+import numpy as np
+import math
+from ultralytics import YOLO
 
-# Example data for RGB estimation
-distances = np.array([0.635, 1, 2, 3])
-R_values = np.array([48.7, 98.1, 127.7, 142.7])
-G_values = np.array([51.6, 114.0, 142.4, 158.8])
-B_values = np.array([52.9, 116.3, 136.2, 155.4])
-
-# Fit polynomials
-poly_R = np.polyfit(distances, R_values, 2)  # 2nd-degree polynomial fit for R
-poly_G = np.polyfit(distances, G_values, 2)  # 2nd-degree polynomial fit for G
-poly_B = np.polyfit(distances, B_values, 2)  # 2nd-degree polynomial fit for B
-
-# Create a polynomial function to estimate RGB values at any distance
-def estimate_rgb(d):
-    R = np.polyval(poly_R, d)
-    G = np.polyval(poly_G, d)
-    B = np.polyval(poly_B, d)
-    return R, G, B
-
-
-
-class OakdHeatmapVisualizer(Node):
+class YOLOTargetDetector(Node):
     def __init__(self):
-        super().__init__('oakd_heatmap_visualizer')
+        super().__init__('yolo_target_detector')
         self.bridge = CvBridge()
-       
-        # Subscribe to the RGB camera topic
-        self.rgb_subscriber = self.create_subscription(
-            Image,
-            '/oakd/rgb/preview/image_raw',  # RGB image topic
-            self.rgb_image_callback,
-            10
+
+        # Subscribe to RGB and Depth Images
+        self.rgb_subscription = self.create_subscription(
+            Image, '/oakd/rgb/preview/image_raw', self.image_callback, 10
         )
-        self.get_logger().info("Subscribed to /oakd/rgb/preview/image_raw topic.")
-       
-        # Subscribe to the depth camera topic
-        self.depth_subscriber = self.create_subscription(
-            Image,
-            '/oakd/stereo/image_raw',  # Depth image topic
-            self.depth_image_callback,
-            10
+        self.depth_subscription = self.create_subscription(
+            Image, '/oakd/stereo/image_raw', self.depth_callback, 10
         )
-        self.get_logger().info("Subscribed to /oakd/stereo/image_raw topic.")
-       
-        # Load YOLO model
-        self.model = YOLO("weights/yolov8n.pt")  # Replace with your YOLO weights file
-       
-        # Initialize variables to hold the latest RGB and depth images
-        self.rgb_image = None
-        self.depth_image = None
 
-    def rgb_image_callback(self, msg):
-        try:
-            # Convert the ROS Image message to an OpenCV image (RGB)
-            self.rgb_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
-        except Exception as e:
-            self.get_logger().error(f"Error processing RGB image: {e}")
+        # Load YOLO Model
+        self.model = YOLO('weights/epochs100.pt')
+        self.target_class_name = "designated-target"
+        self.target_class_id = self.get_target_class_id()
 
-    def depth_image_callback(self, msg):
-        try:
-            # Convert the ROS Image message to an OpenCV image (depth)
-            self.depth_image = self.bridge.imgmsg_to_cv2(msg, desired_encoding='passthrough')
+        # Publishers
+        self.angle_pub = self.create_publisher(Float64, "person_angle", 10)
+        self.distance_pub = self.create_publisher(Float64, "person_distance", 10)
 
-            # Only process when we have both RGB and depth images
-            if self.rgb_image is not None:
-                self.process_images(self.rgb_image, self.depth_image)
+        # Camera Parameters
+        self.fov = 60  # Field of view in degrees
 
-        except Exception as e:
-            self.get_logger().error(f"Error processing depth image: {e}")
+        # Smoothing
+        self.alpha = 0.2
+        self.smoothed_angle = None
+        self.smoothed_distance = None
 
-    def process_images(self, rgb_image, depth_image):
-        try:
-            # Compute 5th and 95th percentile values for contrast adjustment on depth image
-            min_depth = np.percentile(depth_image, 5)  # Closer objects
-            max_depth = np.percentile(depth_image, 95)  # Farther objects
+        # Stores latest depth frame
+        self.latest_depth_frame = None
 
-            # Avoid division by zero in normalization
-            if max_depth - min_depth < 1:
-                max_depth = min_depth + 1
+        self.get_logger().info("YOLO Target Detector Node Started")
 
-            # Normalize depth between min/max percentiles to increase contrast
-            depth_normalized = np.clip(depth_image, min_depth, max_depth)
-            depth_normalized = ((depth_normalized - min_depth) / (max_depth - min_depth)) * 255
-            depth_normalized = np.uint8(depth_normalized)
+    def get_target_class_id(self):
+        for class_id, name in self.model.model.names.items():
+            if name == self.target_class_name:
+                return class_id
+        self.get_logger().error(f"Target class '{self.target_class_name}' not found in model.")
+        raise ValueError(f"Target class '{self.target_class_name}' not found in model.")
 
-            # Invert depth values so closest objects appear white
-            depth_inverted = cv2.bitwise_not(depth_normalized)
+    def smooth_value(self, new_value, smoothed_value):
+        if smoothed_value is None:
+            return new_value
+        return self.alpha * new_value + (1 - self.alpha) * smoothed_value
 
-            # Apply a colormap for better visualization
-            heatmap = cv2.applyColorMap(depth_inverted, cv2.COLORMAP_HOT)
+    def depth_callback(self, msg):
+        """ Stores the latest depth frame. """
+        self.latest_depth_frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding="16UC1")
 
-            # Get the dimensions of both the RGB and depth images
-            rgb_height, rgb_width = rgb_image.shape[:2]
-            depth_height, depth_width = heatmap.shape[:2]
+    def image_callback(self, msg):
+        frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
+        frame_width = frame.shape[1]
+        center_x = frame_width // 2
 
-            # Resize the RGB image to match depth image dimensions (640x480)
-            resized_rgb_image = cv2.resize(rgb_image, (depth_width, depth_height))
+        results = self.model(frame, conf=0.4, verbose=False)
 
-            # Use YOLO to detect persons in the resized RGB image
-            results = self.model(resized_rgb_image)
+        largest_box = None
+        max_area = 0
+        confidence = 0
 
-            # Get the bounding boxes for persons (class ID 0 usually corresponds to people in YOLO)
-            for result in results:  # Each result contains detected objects
-                for box in result.boxes:  # Access the boxes from the result
-                    x1, y1, x2, y2 = box.xyxy[0]  # Bounding box coordinates (xmin, ymin, xmax, ymax)
-                    conf = box.conf[0]  # Confidence score
-                    cls = box.cls[0]  # Class ID
+        # Find the largest bounding box
+        for result in results:
+            for box in result.boxes:
+                cls = int(box.cls[0].item())  
+                confidence = box.conf[0].item()
+                if cls == self.target_class_id and confidence > 0.8:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())  
+                    area = (x2 - x1) * (y2 - y1)
+                    if area > max_area:
+                        max_area = area
+                        largest_box = (x1, y1, x2, y2)
 
-                    if cls == 0:  # Class 0 is typically 'person' in YOLO
-                        # Draw a bounding box around the person on the heatmap
-                        cv2.rectangle(heatmap, (int(x1), int(y1)), (int(x2), int(y2)), (0, 255, 0), 2)
+        if largest_box:
+            x1, y1, x2, y2 = largest_box
+            centroid_x = (x1 + x2) // 2
+            centroid_y = (y1 + y2) // 2
+            bbox_width = x2 - x1
+            bbox_height = y2 - y1
 
-                        # Extract depth values within the bounding box
-                        person_depth = depth_image[int(y1):int(y2), int(x1):int(x2)]
+            # Calculate angle
+            angle_per_pixel = self.fov / frame_width
+            relative_angle = (centroid_x - center_x) * angle_per_pixel
 
-                        # Compute the average depth of the person within the bounding box
-                        avg_depth = np.mean(person_depth)
-                    
-                        # Estimate distance from average depth value (this could be calibrated)
-                        distance = self.convert_depth_to_distance(avg_depth)
+            # Estimate distance using depth image
+            if self.latest_depth_frame is not None:
+                # Resize the depth frame to match the RGB frame size
+                depth_frame_resized = cv2.resize(self.latest_depth_frame, (frame.shape[1], frame.shape[0]), interpolation=cv2.INTER_LINEAR)
+                estimated_distance = self.estimate_depth(centroid_x, centroid_y, bbox_width, bbox_height, depth_frame_resized, frame)
 
-                        # Estimate RGB values at the detected distance
-                        R_est, G_est, B_est = estimate_rgb(distance)
+                estimated_distance -= 0.15
 
-                        # Stack the annotations inside the bounding box
-                        offset_y = 20  # Start stacking below the top of the bounding box
+                if(estimated_distance > 6.6):
+                    estimated_distance -= 0.7
+                elif(estimated_distance > 5.45):
+                    estimated_distance -= 0.5
+                elif(estimated_distance > 4.6):
+                    estimated_distance -= 0.3
+                
 
-                        # Add confidence score
-                        cv2.putText(heatmap, f"Conf: {conf:.2f}", (int(x1), int(y1) + offset_y),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)  # Changed to black
+                # Apply smoothing
+                self.smoothed_angle = self.smooth_value(relative_angle, self.smoothed_angle)
+                self.smoothed_distance = self.smooth_value(estimated_distance, self.smoothed_distance)
 
-                        offset_y += 20  # Increase offset for next line
+                # Draw the bounding box
+                cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 165, 255), 2)
 
-                        # Add estimated distance
-                        cv2.putText(heatmap, f"Distance: {distance:.2f}m", (int(x1), int(y1) + offset_y),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 1)  # Changed to black
+                # Annotations
+                text_y_offset = 20
+                cv2.putText(frame, f"designated-target: {confidence:.2f}", (x1, y1 - text_y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                text_y_offset += 20
+                cv2.putText(frame, f"Angle: {self.smoothed_angle:.2f} degrees", (x1, y1 - text_y_offset),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+                text_y_offset += 20
+                if self.smoothed_distance is not None:
+                    cv2.putText(frame, f"Distance: {self.smoothed_distance:.2f} m", (x1, y1 - text_y_offset),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-                        offset_y += 20  # Increase offset for next line
+                # Publish values
+                angle_msg = Float64()
+                angle_msg.data = self.smoothed_angle
+                self.angle_pub.publish(angle_msg)
 
-                        # Add estimated RGB values
-                        cv2.putText(heatmap, f"RGB: ({int(R_est)}, {int(G_est)}, {int(B_est)})",
-                                    (int(x1), int(y1) + offset_y), cv2.FONT_HERSHEY_SIMPLEX,
-                                    0.6, (0, 0, 0), 1)  # Changed to black
+            else:
+                self.smoothed_distance = 0.0
 
-            # Show the heatmap with bounding boxes
-            cv2.imshow("Heatmap with YOLO Person Detection", heatmap)
+            self.get_logger().info(f"Estimated Distance: {self.smoothed_distance:.2f} meters")
+            distance_msg = Float64()
+            distance_msg.data = self.smoothed_distance
+            self.distance_pub.publish(distance_msg)
+
+            cv2.imshow("Target Detection", frame)
             cv2.waitKey(1)
 
-        except Exception as e:
-            self.get_logger().error(f"Error processing image: {e}")
+    def estimate_depth(self, cx, cy, bbox_width, bbox_height, depth_frame_resized, frame):
+        """ Extracts a smaller ROI around the centroid of the bounding box for the vest. """
+        if depth_frame_resized is None:
+            return 0.0  # No depth data available
 
-    def convert_depth_to_distance(self, depth_value):
-        # Convert depth value (raw intensity or distance) to actual meters
-        # Apply a scaling factor to correct the depth-to-distance mapping
+        # Define smaller ROI size based on bounding box
+        roi_scale = 0.1  # Reduce region to 10% of bounding box size
 
-        # Example calibration parameters (adjust based on your camera's specs)
-        min_depth = 0.2  # meters (nearest object distance)
-        max_depth = 5.0  # meters (farthest object distance)
+        roi_w = max(1, int(bbox_width * roi_scale))
+        roi_h = max(1, int(bbox_height * roi_scale))
 
-        # Normalize depth value from 0 to 1 (based on the range of depth values)
-        depth_normalized = depth_value / 255.0
+        # Ensure ROI is within the image bounds
+        x1 = max(0, cx - roi_w // 2)
+        x2 = min(depth_frame_resized.shape[1], cx + roi_w // 2)
+        y1 = max(0, cy - roi_h // 2)
+        y2 = min(depth_frame_resized.shape[0], cy + roi_h // 2)
 
-        # Map normalized depth value to meters
-        distance = (min_depth + (max_depth - min_depth) * depth_normalized) / 100
+        # Extract ROI
+        roi = depth_frame_resized[y1:y2, x1:x2]
 
-        # Apply scaling factor to correct the estimated distance
-        scaling_factor = 2.0  # Adjust this value based on your calibration tests
-        distance *= scaling_factor
+        # Filter out zero (invalid depth readings)
+        valid_depths = roi[roi > 0]
+        if valid_depths.size == 0:
+            return 0.0  # No valid depth readings
 
-        return distance
+        # Compute median depth in mm and convert to meters
+        avg_depth_mm = np.median(valid_depths)
+        avg_depth_m = avg_depth_mm / 1000.0
+
+        # Debugging: Print unique depth values
+        unique_depths = np.unique(valid_depths)
+        self.get_logger().info(f"Unique Depth Values in ROI: {unique_depths[:10]}")
+
+        # Draw the ROI on the frame (green box)
+        cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+
+        return avg_depth_m
 
 
 def main(args=None):
     rclpy.init(args=args)
-    node = OakdHeatmapVisualizer()
+    node = YOLOTargetDetector()
     rclpy.spin(node)
+    node.destroy_node()
     rclpy.shutdown()
-
+    cv2.destroyAllWindows()
 
 if __name__ == '__main__':
     main()
