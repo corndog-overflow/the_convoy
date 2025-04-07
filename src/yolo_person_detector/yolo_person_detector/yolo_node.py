@@ -124,7 +124,7 @@ class YOLOPersonDetector(Node):
             results = self.model(frame, stream=True)
             for r in results:
                 for box in r.boxes:
-                    if self.class_names[int(box.cls[0])] == "person":
+                    if self.class_names[int(box.cls[0])] == "sports ball":
                         self.process_person_detection(
                             frame, box, frame_width, frame_center_x
                         )
