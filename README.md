@@ -86,13 +86,13 @@ Motor Control/Teleop Node
 ```bash
 ros2 run my_teleop_pkg teleop_twist_keyboard
 ```
-YOLO person tracker Node
+YOLO Person tracker Node
 ```bash
 ros2 run yolo_person_detector yolo_person_detector
 ```
-Color detection Node
+YOLO Vest tracker Node
 ```bash
-ros2 run color_detection color_detection_node
+ros2 run yolo_vest_detector yolo_vest_detector
 ```
 Path Planning Node
 ```bash
