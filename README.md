@@ -78,9 +78,10 @@ Bot 2
 ```
 
 ### Quick Launch Nodes
-Quick sync git to workspace:
+Quick sync and build git to workspace:
 ```bash
 rsync -av --delete ~/Documents/GitHub/the_convoy/src/ ~/ros2_ws/src/
+colcon build
 ```
 Motor Control/Teleop Node
 ```bash
