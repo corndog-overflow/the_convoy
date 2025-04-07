@@ -81,15 +81,16 @@ class YOLOTargetDetector(Node):
             angle_per_pixel = self.fov / frame_width
             relative_angle = (centroid_x - center_x) * angle_per_pixel
 
-            # Estimate distance using the pinhole camera model
-            #if bbox_height > 0:
-            #    estimated_distance = ((self.target_real_height * self.focal_length) / bbox_height) / 10
-            #else:
-            estimated_distance = float(bbox_height)
+            # Get raw bbox height value
+            raw_distance = float(bbox_height)
+            
+            # Apply the transformation formula from PathPlannerNode
+            # Convert from bbox height to actual distance in meters
+            physical_distance = ((raw_distance-98.514)/(-3.0699))/3.28084
 
             # Apply smoothing
             self.smoothed_angle = self.smooth_value(relative_angle, self.smoothed_angle)
-            self.smoothed_distance = self.smooth_value(estimated_distance, self.smoothed_distance)
+            self.smoothed_distance = self.smooth_value(physical_distance, self.smoothed_distance)
 
             # Draw the bounding box and annotations
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 165, 255), 2)
