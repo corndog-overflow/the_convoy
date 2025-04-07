@@ -36,6 +36,16 @@ class YOLOTargetDetector(Node):
         self.alpha = 0.2  # Smoothing factor (0-1, higher is less smoothing)
         self.smoothed_angle = None
         self.smoothed_distance = None
+        
+        # Tracking parameters for object truncation
+        self.frame_height = None
+        self.min_distance_value = 0.1  # Minimum distance value in meters
+        self.max_distance_value = 5.0  # Maximum distance value in meters
+        self.truncation_threshold = 3  # Pixels from frame edge to consider truncated
+        
+        # Parameters for truncated distance calculation
+        self.truncation_scale_factor = 0.01  # Scale factor for inverted height calculation
+        self.truncation_offset = 0.0  # Offset for inverted height calculation
 
     def get_target_class_id(self):
         for class_id, name in self.model.model.names.items():
@@ -54,6 +64,7 @@ class YOLOTargetDetector(Node):
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         frame_width = frame.shape[1]
         frame_height = frame.shape[0]
+        self.frame_height = frame_height  # Store for truncation detection
         center_x = frame_width // 2
 
         results = self.model(frame, conf=0.4, verbose=False)
@@ -76,17 +87,34 @@ class YOLOTargetDetector(Node):
             x1, y1, x2, y2 = largest_box
             centroid_x = (x1 + x2) // 2
             bbox_height = y2 - y1
+            
+            # Check for truncation (box too close to frame edges)
+            is_truncated = (y1 <= self.truncation_threshold or 
+                           y2 >= (frame_height - self.truncation_threshold))
 
             # Calculate angle
             angle_per_pixel = self.fov / frame_width
             relative_angle = (centroid_x - center_x) * angle_per_pixel
 
-            # Get raw bbox height value
+            # Raw height value from bounding box
             raw_distance = float(bbox_height)
             
-            # Apply the transformation formula from PathPlannerNode
-            # Convert from bbox height to actual distance in meters
-            physical_distance = ((raw_distance-98.514)/(-3.0699))/3.28084
+            # Distance calculation based on truncation state
+            if is_truncated:
+                # For truncated bounding boxes, invert the height relationship
+                # Smaller visible height = closer distance
+                # We use a simple inverse linear relationship: dist = scale_factor / height + offset
+                physical_distance = self.truncation_scale_factor / (raw_distance/frame_height) + self.truncation_offset
+                
+                # Add warning text to the frame
+                cv2.putText(frame, "TRUNCATED - INVERTED DIST", (30, 30),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+            else:
+                # Normal calculation using the original formula
+                physical_distance = ((raw_distance-98.514)/(-3.0699))/3.28084
+            
+            # Constrain distance to valid range
+            physical_distance = max(min(physical_distance, self.max_distance_value), self.min_distance_value)
 
             # Apply smoothing
             self.smoothed_angle = self.smooth_value(relative_angle, self.smoothed_angle)
@@ -106,6 +134,16 @@ class YOLOTargetDetector(Node):
             if self.smoothed_distance is not None:
                 cv2.putText(frame, f"Distance: {self.smoothed_distance:.2f} m", (x1, y1 - text_y_offset),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            
+            # Additional debug info
+            text_y_offset += 20
+            cv2.putText(frame, f"Height: {bbox_height} px", (x1, y1 - text_y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+            
+            # Display truncation status
+            text_y_offset += 20
+            cv2.putText(frame, f"Truncated: {is_truncated}", (x1, y1 - text_y_offset),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
             self.get_logger().info(f"Target Angle: {self.smoothed_angle:.2f} degrees")
 
