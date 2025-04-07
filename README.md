@@ -13,9 +13,9 @@ Our main ROS2 nodes are placed within the ```src``` folder in the root of this r
 https://turtlebot.github.io/turtlebot4-user-manual/
 
 ## Setup Guides
-### Quick copy from git to workspace:
+### Quick sync git to workspace:
 ```bash
-cp -r ~/Documents/GitHub/the_convoy/src/* ~/ros2_ws/src/
+rsync -av --delete ~/Documents/GitHub/the_convoy/src/ ~/ros2_ws/src/
 ```
 
 ### How to use our Desktop?
