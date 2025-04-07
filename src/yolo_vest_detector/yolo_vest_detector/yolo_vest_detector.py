@@ -44,8 +44,10 @@ class YOLOTargetDetector(Node):
         self.truncation_threshold = 3  # Pixels from frame edge to consider truncated
         
         # Parameters for truncated distance calculation
-        self.truncation_scale_factor = 0.01  # Scale factor for inverted height calculation
-        self.truncation_offset = 0.0  # Offset for inverted height calculation
+        self.max_trunc_distance = 1.0  # Maximum distance when truncation begins (in meters)
+        self.min_trunc_distance = 0.1  # Minimum distance at maximum truncation (in meters)
+        self.min_truncated_height = 50  # Height (in pixels) considered fully truncated
+        self.max_truncated_height = 200  # Height (in pixels) at beginning of truncation
 
     def get_target_class_id(self):
         for class_id, name in self.model.model.names.items():
@@ -59,6 +61,21 @@ class YOLOTargetDetector(Node):
             return new_value
         return self.alpha * new_value + (1 - self.alpha) * smoothed_value
 
+    def calculate_truncated_distance(self, height):
+        """
+        Calculate distance for truncated bounding boxes using linear interpolation.
+        Maps from min_truncated_height -> max_truncated_height to max_trunc_distance -> min_trunc_distance
+        """
+        # Constrain height to the defined range
+        clamped_height = max(min(height, self.max_truncated_height), self.min_truncated_height)
+        
+        # Calculate the interpolation factor (0.0 to 1.0)
+        # 1.0 means height = min_truncated_height (fully truncated)
+        # 0.0 means height = max_truncated_height (barely truncated)
+        t = 1.0 - (clamped_height - self.min_truncated_height) / (self.max_truncated_height - self.min_truncated_height)
+        
+        # Linear interpolation between max_trunc_distance and min_trunc_distance
+        return self.max_trunc_distance * (1.0 - t) + self.min_trunc_distance * t
 
     def image_callback(self, msg):
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
@@ -101,13 +118,11 @@ class YOLOTargetDetector(Node):
             
             # Distance calculation based on truncation state
             if is_truncated:
-                # For truncated bounding boxes, invert the height relationship
-                # Smaller visible height = closer distance
-                # We use a simple inverse linear relationship: dist = scale_factor / height + offset
-                physical_distance = self.truncation_scale_factor / (raw_distance/frame_height) + self.truncation_offset
+                # For truncated bounding boxes, use linear interpolation
+                physical_distance = self.calculate_truncated_distance(bbox_height)
                 
                 # Add warning text to the frame
-                cv2.putText(frame, "TRUNCATED - INVERTED DIST", (30, 30),
+                cv2.putText(frame, "TRUNCATED - LINEAR DIST", (30, 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
             else:
                 # Normal calculation using the original formula
