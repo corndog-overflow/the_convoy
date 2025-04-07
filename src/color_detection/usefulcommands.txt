@@ -1,1 +1,0 @@
-ros2 run color_detection color_detection_node
