@@ -129,8 +129,9 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr 
     double prev_distance = person_distance;
     const double APPROACH_SPEED_LIMIT = 0.2;  // Reduced speed limit for safety
     
-    // Define angle deadzone to reduce wiggling
+    // Define deadzones to reduce wiggling
     const double ANGLE_DEADZONE = 3.0;  // degrees
+    const double DISTANCE_DEADZONE = 0.02;  // meters
 
     while (rclcpp::ok() && tracking) {
         // Calculate errors for PID controllers
@@ -148,23 +149,31 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr 
             cmd_msg.twist.angular.z = -angular_pid.compute(angular_error);
         }
 
-        // Compute linear control command
-        double pid_output = linear_pid.compute(linear_error);
-
-        // Limit approach speed based on distance - more conservative for close following
-        double distance_to_target = std::abs(linear_error);
-        double max_speed = std::min(APPROACH_SPEED_LIMIT, std::max(0.05, distance_to_target * 0.3));
-        cmd_msg.twist.linear.x = std::clamp(pid_output, -max_speed, max_speed);
-
-        // If very close to target distance, reduce movement to minimize oscillation
-        if (distance_to_target < 0.05) {
-            cmd_msg.twist.linear.x *= 0.5;  // Reduce speed when very close to target
-        }
-
-        // Enhanced safety check for close following
-        if (approach_velocity > 0.3 && distance_to_target < 0.5) {
+        // Compute linear control command with deadzone
+        if (std::abs(linear_error) < DISTANCE_DEADZONE) {
+            // Within distance deadzone - keep robot still (no forward/backward movement)
             cmd_msg.twist.linear.x = 0.0;
+            // Reset linear PID to prevent integral windup
             linear_pid.reset();
+        } else {
+            // Outside deadzone - use PID control
+            double pid_output = linear_pid.compute(linear_error);
+
+            // Limit approach speed based on distance - more conservative for close following
+            double distance_to_target = std::abs(linear_error);
+            double max_speed = std::min(APPROACH_SPEED_LIMIT, std::max(0.05, distance_to_target * 0.3));
+            cmd_msg.twist.linear.x = std::clamp(pid_output, -max_speed, max_speed);
+
+            // If very close to target distance, reduce movement to minimize oscillation
+            if (distance_to_target < 0.05) {
+                cmd_msg.twist.linear.x *= 0.5;  // Reduce speed when very close to target
+            }
+
+            // Enhanced safety check for close following
+            if (approach_velocity > 0.3 && distance_to_target < 0.5) {
+                cmd_msg.twist.linear.x = 0.0;
+                linear_pid.reset();
+            }
         }
 
         // Set the timestamp
