@@ -36,17 +36,6 @@ class YOLOTargetDetector(Node):
         self.alpha = 0.2  # Smoothing factor (0-1, higher is less smoothing)
         self.smoothed_angle = None
         self.smoothed_distance = None
-        
-        # Tracking parameters for object truncation
-        self.frame_height = None
-        self.min_distance_value = 0.1  # Minimum distance value in meters
-        self.max_distance_value = 5.0  # Maximum distance value in meters
-        self.truncation_threshold = 10  # Pixels from frame edge to consider truncated
-        
-        # Parameters for area-based distance calculation
-        # These would need to be calibrated for your specific setup
-        self.area_distance_constant = 5000000  # Constant for area-to-distance conversion
-        self.area_distance_power = 0.5  # Power factor for area-to-distance relationship
 
     def get_target_class_id(self):
         for class_id, name in self.model.model.names.items():
@@ -60,17 +49,11 @@ class YOLOTargetDetector(Node):
             return new_value
         return self.alpha * new_value + (1 - self.alpha) * smoothed_value
 
-    def calculate_distance_from_area(self, area):
-        # Area-based distance estimation using inverse square relationship
-        # Distance is inversely proportional to the square root of the area
-        # d ∝ 1/√A => d = k/√A or d = k/(A^0.5)
-        return self.area_distance_constant / (area ** self.area_distance_power)
 
     def image_callback(self, msg):
         frame = self.bridge.imgmsg_to_cv2(msg, desired_encoding='bgr8')
         frame_width = frame.shape[1]
         frame_height = frame.shape[0]
-        self.frame_height = frame_height  # Store for truncation detection
         center_x = frame_width // 2
 
         results = self.model(frame, conf=0.4, verbose=False)
@@ -93,32 +76,17 @@ class YOLOTargetDetector(Node):
             x1, y1, x2, y2 = largest_box
             centroid_x = (x1 + x2) // 2
             bbox_height = y2 - y1
-            bbox_width = x2 - x1
-            bbox_area = bbox_height * bbox_width
-            
-            # Check for truncation (box too close to frame edges)
-            is_truncated = (y1 <= self.truncation_threshold or 
-                           y2 >= (frame_height - self.truncation_threshold))
 
             # Calculate angle
             angle_per_pixel = self.fov / frame_width
             relative_angle = (centroid_x - center_x) * angle_per_pixel
 
-            # Distance calculation based on truncation state
-            if is_truncated:
-                # If object is truncated, use area-based distance calculation
-                physical_distance = self.calculate_distance_from_area(bbox_area)
-                
-                # Add warning text to the frame
-                cv2.putText(frame, "TRUNCATED - USING AREA", (30, 30),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
-            else:
-                # Normal calculation using height
-                raw_distance = float(bbox_height)
-                physical_distance = ((raw_distance-98.514)/(-3.0699))/3.28084
+            # Get raw bbox height value
+            raw_distance = float(bbox_height)
             
-            # Constrain distance to valid range
-            physical_distance = max(min(physical_distance, self.max_distance_value), self.min_distance_value)
+            # Apply the transformation formula from PathPlannerNode
+            # Convert from bbox height to actual distance in meters
+            physical_distance = ((raw_distance-98.514)/(-3.0699))/3.28084
 
             # Apply smoothing
             self.smoothed_angle = self.smooth_value(relative_angle, self.smoothed_angle)
@@ -138,11 +106,6 @@ class YOLOTargetDetector(Node):
             if self.smoothed_distance is not None:
                 cv2.putText(frame, f"Distance: {self.smoothed_distance:.2f} m", (x1, y1 - text_y_offset),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
-            
-            # Additional debug info
-            text_y_offset += 20
-            cv2.putText(frame, f"Area: {bbox_area}", (x1, y1 - text_y_offset),
-                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
             self.get_logger().info(f"Target Angle: {self.smoothed_angle:.2f} degrees")
 
@@ -156,6 +119,7 @@ class YOLOTargetDetector(Node):
         distance_msg = Float64()
         distance_msg.data = self.smoothed_distance
         self.distance_pub.publish(distance_msg)
+
 
         cv2.imshow("Target Detection", frame)
         cv2.waitKey(1)
