@@ -13,11 +13,6 @@ Our main ROS2 nodes are placed within the ```src``` folder in the root of this r
 https://turtlebot.github.io/turtlebot4-user-manual/
 
 ## Setup Guides
-### Quick sync git to workspace:
-```bash
-rsync -av --delete ~/Documents/GitHub/the_convoy/src/ ~/ros2_ws/src/
-```
-
 ### How to use our Desktop?
 1. Turn on computer by pressing power button
 2. Wait
@@ -83,6 +78,10 @@ Bot 2
 ```
 
 ### Quick Launch Nodes
+Quick sync git to workspace:
+```bash
+rsync -av --delete ~/Documents/GitHub/the_convoy/src/ ~/ros2_ws/src/
+```
 Motor Control/Teleop Node
 ```bash
 ros2 run my_teleop_pkg teleop_twist_keyboard
