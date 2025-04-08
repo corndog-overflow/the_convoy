@@ -178,15 +178,17 @@ class PathPlannerNode(Node):
         
     def navigate_to_person(self):
         """Navigate to the person's current position with latest sensor data."""
-        # Determine which values to use (current or last valid)
-        if self.person_visible:
-            angle_to_use = self.person_angle
-            distance_to_use = self.person_distance
-            target_status = "CURRENT"
-        else:
-            angle_to_use = self.last_valid_angle
-            distance_to_use = self.last_valid_distance
-            target_status = "LAST KNOWN"
+        # When person is not visible, don't send new goals
+        if not self.person_visible:
+            self.get_logger().info('=' * 50)
+            self.get_logger().info("NAVIGATION STATUS: VEST NOT DETECTED")
+            self.get_logger().info("Not sending new goal pose, continuing with previous goal")
+            self.get_logger().info('=' * 50)
+            return  # Exit without sending a new goal
+        
+        # Only send new goals when person is visible
+        angle_to_use = self.person_angle
+        distance_to_use = self.person_distance
         
         # Calculate new x and y coordinates based on sensor data
         x = distance_to_use
@@ -198,7 +200,7 @@ class PathPlannerNode(Node):
         print(y)
 
         self.get_logger().info('=' * 50)
-        self.get_logger().info(f"NAVIGATION CALCULATION ({target_status} POSITION):")
+        self.get_logger().info("NAVIGATION CALCULATION (CURRENT POSITION):")
         self.get_logger().info(f"Input angle: {angle_to_use:.2f}° ({math.radians(angle_to_use):.2f} radians)")
         self.get_logger().info(f"Input distance: {distance_to_use:.2f} meters")
         self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
