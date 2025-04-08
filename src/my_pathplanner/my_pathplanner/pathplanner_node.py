@@ -171,7 +171,7 @@ class PathPlannerNode(Node):
         self.get_logger().info("Nav2 is now active!")
         
         # Set up the timer for continuous navigation (twice per second)
-        self.navigation_timer = self.create_timer(0.1, self.navigate_to_person)
+        self.navigation_timer = self.create_timer(0.5, self.navigate_to_person)
         
         # Start the first navigation
         self.navigate_to_person()
