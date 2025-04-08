@@ -53,7 +53,7 @@ class PathPlannerNode(Node):
         )
         
         # Create loggers for angle and distance data
-        self.create_timer(0.5, self.log_data)
+        self.create_timer(0.1, self.log_data)
         
         # Create a timer to start navigation after node is fully initialized and data is received
         self.init_timer = self.create_timer(1.0, self.check_data)
