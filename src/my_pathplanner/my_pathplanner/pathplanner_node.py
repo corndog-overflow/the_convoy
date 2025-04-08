@@ -104,7 +104,9 @@ class PathPlannerNode(Node):
     def navigate_to_person(self):
         """Navigate to the person's current position with latest sensor data."""
         # Calculate new x and y coordinates based on latest sensor data
-        x = ((self.person_distance-98.514)/(-3.0699))/3.28084
+        # Already done in vest_detector_node
+        # x = ((self.person_distance-98.514)/(-3.0699))/3.28084
+        x = self.person_distance
         y = math.tan(math.radians(self.person_angle)) * -x
         
         print("X VALUE:**************************************************************")
