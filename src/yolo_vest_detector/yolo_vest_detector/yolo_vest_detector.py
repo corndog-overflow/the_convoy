@@ -2,7 +2,7 @@ import rclpy
 from rclpy.node import Node
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
-from std_msgs.msg import Float64
+from std_msgs.msg import Float64, Bool
 import cv2
 import torch
 import numpy as np
@@ -24,8 +24,11 @@ class YOLOTargetDetector(Node):
         self.target_class_id = self.get_target_class_id()
         self.get_logger().info("YOLO Target Detector Node Started")
 
+        # Publishers
         self.angle_pub = self.create_publisher(Float64, "person_angle", 10)
         self.distance_pub = self.create_publisher(Float64, "person_distance", 10)
+        # New publisher for detection status
+        self.detection_pub = self.create_publisher(Bool, "vest_detected", 10)
 
         # Camera parameters (tune based on actual setup)
         self.fov = 60  # Field of view in degrees
@@ -89,16 +92,24 @@ class YOLOTargetDetector(Node):
         largest_box = None
         max_area = 0
         confidence = 0
+        vest_detected = False
+
         for result in results:
             for box in result.boxes:
                 cls = int(box.cls[0].item())  
                 confidence = box.conf[0].item()
                 if cls == self.target_class_id and confidence > 0.8:
+                    vest_detected = True  # Set detection flag to True
                     x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())  
                     area = (x2 - x1) * (y2 - y1)
                     if area > max_area:
                         max_area = area
                         largest_box = (x1, y1, x2, y2)
+
+        # Publish detection status with each frame
+        detection_msg = Bool()
+        detection_msg.data = vest_detected
+        self.detection_pub.publish(detection_msg)
 
         if largest_box:
             x1, y1, x2, y2 = largest_box
@@ -165,14 +176,25 @@ class YOLOTargetDetector(Node):
             angle_msg = Float64()
             angle_msg.data = self.smoothed_angle
             self.angle_pub.publish(angle_msg)
+            
+            distance_msg = Float64()
+            distance_msg.data = self.smoothed_distance
+            self.distance_pub.publish(distance_msg)
         else:
+            # Even when no vest is detected, continue publishing distance as 0
+            # (this helps the path_planner know we're not detecting anything)
             self.smoothed_distance = 0.0
+            distance_msg = Float64()
+            distance_msg.data = self.smoothed_distance
+            self.distance_pub.publish(distance_msg)
 
-        self.get_logger().info(f"Estimated Distance: {self.smoothed_distance:.2f} meters")
-        distance_msg = Float64()
-        distance_msg.data = self.smoothed_distance
-        self.distance_pub.publish(distance_msg)
+        # Add detection status text at the top of the frame
+        detection_text = "VEST DETECTED" if vest_detected else "NO VEST DETECTED"
+        detection_color = (0, 255, 0) if vest_detected else (0, 0, 255)  # Green if detected, red if not
+        cv2.putText(frame, detection_text, (frame_width // 2 - 100, 30),
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.8, detection_color, 2)
 
+        self.get_logger().info(f"Vest Detected: {vest_detected}, Estimated Distance: {self.smoothed_distance:.2f} meters")
 
         cv2.imshow("Target Detection", frame)
         cv2.waitKey(1)
