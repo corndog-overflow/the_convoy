@@ -19,7 +19,7 @@ class YOLOTargetDetector(Node):
             self.image_callback,
             10
         )
-        self.model = YOLO('weights/bens_balls.pt')
+        self.model = YOLO('/yolo_balls_detector/weights/bens_balls.pt')
         self.target_class_name = "Tennis_Ball"
         self.target_class_id = self.get_target_class_id()
         self.get_logger().info("YOLO Target Detector Node Started")
