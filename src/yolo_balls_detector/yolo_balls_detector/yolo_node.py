@@ -19,16 +19,16 @@ class YOLOTargetDetector(Node):
             self.image_callback,
             10
         )
-        self.model = YOLO('/yolo_balls_detector/weights/bens_balls.pt')
+        self.model = YOLO('weights/bens_balls.pt')
         self.target_class_name = "Tennis_Ball"
         self.target_class_id = self.get_target_class_id()
         self.get_logger().info("YOLO Target Detector Node Started")
 
         # Publishers
-        self.angle_pub = self.create_publisher(Float64, "person_angle", 10)
-        self.distance_pub = self.create_publisher(Float64, "person_distance", 10)
+        self.angle_pub = self.create_publisher(Float64, "target_angle", 10)
+        self.distance_pub = self.create_publisher(Float64, "target_distance", 10)
         # New publisher for detection status
-        self.detection_pub = self.create_publisher(Bool, "vest_detected", 10)
+        self.detection_pub = self.create_publisher(Bool, "no_target_found", 10)
 
         # Camera parameters (tune based on actual setup)
         self.fov = 60  # Field of view in degrees
@@ -189,12 +189,12 @@ class YOLOTargetDetector(Node):
             self.distance_pub.publish(distance_msg)
 
         # Add detection status text at the top of the frame
-        detection_text = "VEST DETECTED" if vest_detected else "NO VEST DETECTED"
+        detection_text = "TARGET DETECTED" if vest_detected else "NO TARGET DETECTED"
         detection_color = (0, 255, 0) if vest_detected else (0, 0, 255)  # Green if detected, red if not
         cv2.putText(frame, detection_text, (frame_width // 2 - 100, 30),
                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, detection_color, 2)
 
-        self.get_logger().info(f"Vest Detected: {vest_detected}, Estimated Distance: {self.smoothed_distance:.2f} meters")
+        self.get_logger().info(f"Target Detected: {vest_detected}, Estimated Distance: {self.smoothed_distance:.2f} meters")
 
         cv2.imshow("Target Detection", frame)
         cv2.waitKey(1)
