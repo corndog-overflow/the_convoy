@@ -144,6 +144,7 @@ cat /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
 ```
 ```
 sudo cp ~/oakd_lite.yaml /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
+sudo cp ~/nav2.yaml /opt/ros/jazzy/share/turtlebot4_navigation/config/nav2.yaml
 ```
 ```
 /oakd:
