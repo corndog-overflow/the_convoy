@@ -35,9 +35,9 @@ CTRL-C to quit
 std::map<char, std::tuple<float, float>> moveBindings{{'i', {1, 0}}, {'o', {1, -1}}, {'j', {0, 1}},  {'l', {0, -1}},
                                                       {'u', {1, 1}}, {',', {-1, 0}}, {'.', {-1, 1}}, {'m', {-1, -1}}};
 
-// Map keyboard keys to speed multiplier values
-std::map<char, std::tuple<float, float>> speedBindings{{'q', {1.1, 1.1}}, {'z', {0.9, 0.9}}, {'w', {1.1, 1}},
-                                                       {'x', {0.9, 1}},   {'e', {1, 1.1}},   {'c', {1, 0.9}}};
+// Map keyboard keys to speed multiplier values - reduced angular speed multipliers
+std::map<char, std::tuple<float, float>> speedBindings{{'q', {1.1, 1.05}}, {'z', {0.9, 0.95}}, {'w', {1.1, 1}},
+                                                       {'x', {0.9, 1}},   {'e', {1, 1.05}},   {'c', {1, 0.95}}};
 
 // Helper struct to manage terminal settings
 struct TerminalSettings {
@@ -122,17 +122,17 @@ class PIDController {
 void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub, float &person_angle,
                  float &person_distance, float target_distance, rclcpp::Node::SharedPtr node,
                  std::atomic<bool> &tracking) {
-    // Adjusted PID parameters for closer following
-    PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5);
-    PIDController linear_pid(0.3, 0.0, 0.1, -0.3, 0.3); // Reduced gains for smoother control
+    // Reduced PID parameters for slower rotation
+    PIDController angular_pid(0.03, 0.0005, 0.007, -0.3, 0.3);  // Reduced gains and output limits
+    PIDController linear_pid(0.3, 0.0, 0.1, -0.3, 0.3); // Kept the same for linear movement
     geometry_msgs::msg::TwistStamped cmd_msg;
 
     double prev_distance = person_distance;
-    const double APPROACH_SPEED_LIMIT = 0.2; // Reduced speed limit for safety
+    const double APPROACH_SPEED_LIMIT = 0.2; // Kept the same linear speed limit
 
-    // Define deadzones to reduce wiggling
-    const double ANGLE_DEADZONE = 3.0;     // degrees
-    const double DISTANCE_DEADZONE = 0.02; // meters
+    // Increased deadzone to reduce small adjustments
+    const double ANGLE_DEADZONE = 5.0;     // degrees (increased from 3.0)
+    const double DISTANCE_DEADZONE = 0.02; // meters (kept the same)
 
     while (rclcpp::ok() && tracking) {
         // Calculate errors for PID controllers
@@ -146,8 +146,8 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr 
             // Within deadzone - keep robot still (no rotation)
             cmd_msg.twist.angular.z = 0.0;
         } else {
-            // Outside deadzone - use PID control
-            cmd_msg.twist.angular.z = -angular_pid.compute(angular_error);
+            // Outside deadzone - use PID control with additional damping factor
+            cmd_msg.twist.angular.z = -angular_pid.compute(angular_error) * 0.7;  // Added 0.7 damping factor
         }
 
         // Compute linear control command with deadzone
@@ -204,13 +204,13 @@ int main(int argc, char **argv) {
     // Create publisher for cmd_vel_motor (to be handled by coordinator)
     auto pub_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel_motor", 10);
 
-    // Initialize control variables
-    float speed = 1.0, turn = 1.0;
+    // Initialize control variables - reduced default turn value
+    float speed = 1.0, turn = 0.6;  // Reduced from 1.0 to 0.6
     float person_angle = 0.0, person_distance = -1.0;
     std::atomic<bool> tracking{false};
     std::string current_control_mode = "unknown";
 
-    // Target following distance (changed from 2.0m to 0.3m)
+    // Target following distance (kept at 0.3m)
     const float TARGET_DISTANCE = 0.3;
 
     // Subscribe to person tracking topics
@@ -284,7 +284,8 @@ int main(int argc, char **argv) {
                 msg.header.stamp = node->get_clock()->now();
                 msg.header.frame_id = "base_link";
                 msg.twist.linear.x = x * speed;
-                msg.twist.angular.z = th * turn;
+                // Apply additional damping to rotation commands for smoother turns
+                msg.twist.angular.z = (th * turn) * 0.8;  // Added 0.8 multiplier to slow rotation
                 pub_twist->publish(msg);
             }
         }
