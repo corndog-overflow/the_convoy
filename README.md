@@ -1,9 +1,6 @@
 # 2025 Senior Design Capstone; 
 ## Team 10: The Convoy
 **Sponsored by The Charles Stark Draper Laboratory**
-```
-ros2 service call /lifecycle_manager_navigation/manage_nodes nav2_msgs/srv/ManageLifecycleNodes "{command: 1}"
-```
 ## Project Overview
 A robotic convoy that seamlessly collaborates as one unit, though segmented into individual actors, each communicating effectively to survey their environment with high degrees of accuracy.
 With robust autonomous navigation systems, the convoy engages in follow the leader behavior and obstacle avoidance to traverse dynamic environments for use in fields like agriculture, disaster relief and medical environments.
@@ -85,17 +82,17 @@ Quick sync and build git to workspace:
 rsync -av --delete ~/Documents/GitHub/the_convoy/src/ ~/ros2_ws/src/
 colcon build
 ```
-Motor Control/Teleop Node
-```bash
-ros2 run my_teleop_pkg teleop_twist_keyboard
-```
-YOLO Person tracker Node
-```bash
-ros2 run yolo_person_detector yolo_person_detector
-```
-YOLO Vest tracker Node
+Vest Detector Node
 ```bash
 ros2 run yolo_vest_detector yolo_vest_detector
+```
+Vest Detector Node
+```bash
+ros2 run control_coordinator control_coordinator
+```
+Teleop Motor Node
+```bash
+ros2 run my_teleop_pkg teleop_twist_keyboard
 ```
 Path Planning Node
 ```bash
@@ -134,52 +131,11 @@ chmod +x launch_robot.sh
 ```
 
 ### Instructions on how to enable camera:
-make sure bot is set to lite
-```
+Launch rviz
+```bash
 ros2 launch turtlebot4_viz view_model.launch.py
 ```
-this turns on stereo camera!!!
-```
-cat /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
-```
-```
-sudo cp ~/oakd_lite.yaml /opt/ros/jazzy/share/turtlebot4_bringup/config/oakd_lite.yaml
+Copy nav2.yaml to /opt/ros/jazzy/share/turtlebot4_navigation/config/nav2.yaml
+```bash
 sudo cp ~/nav2.yaml /opt/ros/jazzy/share/turtlebot4_navigation/config/nav2.yaml
-```
-```
-/oakd:
-  ros__parameters:
-    camera:
-      i_enable_imu: false
-      i_enable_ir: false
-      i_nn_type: none
-      i_pipeline_type: RGBD
-      i_usb_speed: SUPER_PLUS
-    rgb:
-      i_board_socket_id: 0
-      i_fps: 30.0
-      i_height: 720
-      i_interleaved: false
-      i_max_q_size: 10
-      i_preview_size: 250
-      i_enable_preview: true
-      i_low_bandwidth: true
-      i_keep_preview_aspect_ratio: true
-      i_publish_topic: false
-      i_resolution: '1080'
-      i_width: 1280
-    stereo:
-      i_board_socket_id: 1
-      i_fps: 30.0
-      i_height: 480
-      i_width: 640
-      i_depth_align: true
-      i_subpixel: true
-      i_lr_check: true
-      i_extended: false
-      i_confidence_threshold: 200
-      i_left_right_check_threshold: 5
-      i_enable_preview: true
-      i_publish_topic: true
-    use_sim_time: false
 ```
