@@ -118,76 +118,83 @@ class PIDController {
 };
 
 // Function to handle person tracking behavior
-void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub, float &person_angle,
-                 float &person_distance, float target_distance, rclcpp::Node::SharedPtr node,
-                 std::atomic<bool> &tracking) {
-    // Adjusted PID parameters for closer following
+void trackPerson(
+    rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub,
+    float &person_angle,
+    std::atomic<float> &person_distance,
+    float target_distance,
+    rclcpp::Node::SharedPtr node,
+    std::atomic<bool> &tracking,
+    std::atomic<std::chrono::steady_clock::time_point> &last_detection_time) {
+
     PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5);
-    PIDController linear_pid(0.3, 0.0, 0.1, -0.3, 0.3); // Reduced gains for smoother control
+    PIDController linear_pid(0.3, 0.0, 0.1, -0.3, 0.3);
     geometry_msgs::msg::TwistStamped cmd_msg;
 
-    double prev_distance = person_distance;
-    const double APPROACH_SPEED_LIMIT = 0.2; // Reduced speed limit for safety
-
-    // Define deadzones to reduce wiggling
-    const double ANGLE_DEADZONE = 3.0;     // degrees
-    const double DISTANCE_DEADZONE = 0.02; // meters
+    double prev_distance = person_distance.load();
+    const double APPROACH_SPEED_LIMIT = 0.4;
+    const double ANGLE_DEADZONE = 3.0;
+    const double DISTANCE_DEADZONE = 0.02;
+    const double START_MOVING_DISTANCE = 3.0;
 
     while (rclcpp::ok() && tracking) {
-        // Calculate errors for PID controllers
-        double angular_error = person_angle;
-        double linear_error = person_distance - target_distance;
-        double approach_velocity = (prev_distance - person_distance) / 0.05;
-        prev_distance = person_distance;
+        auto now = std::chrono::steady_clock::now();
+        auto time_since_last_detection = std::chrono::duration_cast<std::chrono::seconds>(now - last_detection_time.load()).count();
+        bool detection_lost = (time_since_last_detection > 3);
 
-        // Compute angular control command with deadzone
-        if (std::abs(angular_error) < ANGLE_DEADZONE) {
-            // Within deadzone - keep robot still (no rotation)
+        if (detection_lost) {
+            cmd_msg.twist.linear.x = 0.0;
             cmd_msg.twist.angular.z = 0.0;
-        } else {
-            // Outside deadzone - use PID control
-            cmd_msg.twist.angular.z = -angular_pid.compute(angular_error);
+            cmd_msg.header.stamp = node->get_clock()->now();
+            pub->publish(cmd_msg);
+            RCLCPP_WARN(node->get_logger(), "Person detection lost for %.0ld seconds — stopping.", time_since_last_detection);
+            std::this_thread::sleep_for(std::chrono::milliseconds(100));
+            continue;
         }
 
-        // Compute linear control command with deadzone
-        if (std::abs(linear_error) < DISTANCE_DEADZONE) {
-            // Within distance deadzone - keep robot still (no forward/backward movement)
+        float current_distance = person_distance.load();
+        double angular_error = person_angle;
+        double linear_error = current_distance - target_distance;
+        double approach_velocity = (prev_distance - current_distance) / 0.05;
+        prev_distance = current_distance;
+
+        if (current_distance <= START_MOVING_DISTANCE) {
             cmd_msg.twist.linear.x = 0.0;
-            // Reset linear PID to prevent integral windup
+            cmd_msg.twist.angular.z = 0.0;
             linear_pid.reset();
+            angular_pid.reset();
+            RCLCPP_INFO(node->get_logger(), "Person is within %.2f m — stopping movement.", START_MOVING_DISTANCE);
         } else {
-            // Outside deadzone - use PID control
-            double pid_output = linear_pid.compute(linear_error);
+            cmd_msg.twist.angular.z = (std::abs(angular_error) < ANGLE_DEADZONE) ? 0.0 : -angular_pid.compute(angular_error);
 
-            // Limit approach speed based on distance - more conservative for close following
-            double distance_to_target = std::abs(linear_error);
-            double max_speed = std::min(APPROACH_SPEED_LIMIT, std::max(0.05, distance_to_target * 0.3));
-            cmd_msg.twist.linear.x = std::clamp(pid_output, -max_speed, max_speed);
-
-            // If very close to target distance, reduce movement to minimize oscillation
-            if (distance_to_target < 0.05) {
-                cmd_msg.twist.linear.x *= 0.5; // Reduce speed when very close to target
-            }
-
-            // Enhanced safety check for close following
-            if (approach_velocity > 0.3 && distance_to_target < 0.5) {
+            if (std::abs(linear_error) < DISTANCE_DEADZONE) {
                 cmd_msg.twist.linear.x = 0.0;
                 linear_pid.reset();
+            } else {
+                double pid_output = linear_pid.compute(linear_error);
+                double distance_to_target = std::abs(linear_error);
+                double max_speed = std::min(APPROACH_SPEED_LIMIT, std::max(0.05, distance_to_target * 0.3));
+                cmd_msg.twist.linear.x = std::clamp(pid_output, -max_speed, max_speed);
+
+                if (distance_to_target < 0.05) cmd_msg.twist.linear.x *= 0.5;
+                if (approach_velocity > 0.3 && distance_to_target < 0.5) {
+                    cmd_msg.twist.linear.x = 0.0;
+                    linear_pid.reset();
+                }
             }
         }
 
-        // Set the timestamp
         cmd_msg.header.stamp = node->get_clock()->now();
         cmd_msg.header.frame_id = "base_link";
-
         pub->publish(cmd_msg);
+
         RCLCPP_INFO(node->get_logger(),
                     "Tracking... Angle: %.2f deg (cmd: %.2f), Distance: %.2f m (cmd: %.2f), Approach Speed: %.2f",
-                    person_angle, cmd_msg.twist.angular.z, person_distance, cmd_msg.twist.linear.x, approach_velocity);
+                    person_angle, cmd_msg.twist.angular.z, current_distance, cmd_msg.twist.linear.x, approach_velocity);
+
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
-    // Stop robot when tracking ends
     cmd_msg.twist.linear.x = 0.0;
     cmd_msg.twist.angular.z = 0.0;
     cmd_msg.header.stamp = node->get_clock()->now();
@@ -195,81 +202,69 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr 
     RCLCPP_INFO(node->get_logger(), "Stopped tracking.");
 }
 
+
 int main(int argc, char **argv) {
-    // Initialize ROS2 node
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("teleop_twist_keyboard");
-    
-    // Create publisher for cmd_vel
+
     auto pub_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel", 10);
 
-    // Initialize control variables
     float speed = 1.0, turn = 1.0;
-    float person_angle = 0.0, person_distance = -1.0;
+    float person_angle = 0.0;
+    std::atomic<float> person_distance{-1.0};
+    std::atomic<std::chrono::steady_clock::time_point> last_detection_time = std::chrono::steady_clock::now();
     std::atomic<bool> tracking{false};
 
-    // Target following distance
     const float TARGET_DISTANCE = 0.3;
 
-    // Subscribe to person tracking topics
     auto sub_angle = node->create_subscription<std_msgs::msg::Float64>(
-        "person_angle", 10, [&person_angle](std_msgs::msg::Float64::SharedPtr msg) { person_angle = msg->data; });
+        "person_angle", 10,
+        [&person_angle](std_msgs::msg::Float64::SharedPtr msg) { person_angle = msg->data; });
 
     auto sub_distance = node->create_subscription<std_msgs::msg::Float64>(
         "person_distance", 10,
-        [&person_distance](std_msgs::msg::Float64::SharedPtr msg) { person_distance = msg->data; });
+        [&person_distance, &last_detection_time](std_msgs::msg::Float64::SharedPtr msg) {
+            person_distance = msg->data;
+            last_detection_time = std::chrono::steady_clock::now();
+        });
 
-    // Create timer for status updates
     auto timer = node->create_wall_timer(std::chrono::milliseconds(100),
                                          [&]() { printStatus(speed, turn, person_angle, person_distance); });
 
-    // Start ROS2 spin thread
     std::thread spin_thread([&]() { rclcpp::spin(node); });
 
-    // Setup terminal for keyboard input
     TerminalSettings terminal;
     terminal.save();
 
     try {
         std::cout << usage_msg;
 
-        // Main control loop
         while (rclcpp::ok()) {
             char key = getKey();
             float x = 0, th = 0;
 
-            // Handle movement commands
             if (moveBindings.count(key)) {
                 std::tie(x, th) = moveBindings[key];
-            }
-            // Handle speed adjustment commands
-            else if (speedBindings.count(key)) {
+            } else if (speedBindings.count(key)) {
                 auto [speed_mult, turn_mult] = speedBindings[key];
                 speed *= speed_mult;
                 turn *= turn_mult;
                 continue;
-            }
-            // Toggle person tracking
-            else if (key == 'P' || key == 'p') {
+            } else if (key == 'P' || key == 'p') {
                 tracking = !tracking;
                 if (tracking) {
                     std::thread(trackPerson, pub_twist, std::ref(person_angle), std::ref(person_distance),
-                                TARGET_DISTANCE, node, std::ref(tracking))
-                        .detach();
+                                TARGET_DISTANCE, node, std::ref(tracking), std::ref(last_detection_time)).detach();
                     RCLCPP_INFO(node->get_logger(), "Person tracking enabled");
                 } else {
                     RCLCPP_INFO(node->get_logger(), "Person tracking disabled");
                 }
                 continue;
-            }
-            // Exit on Ctrl-C
-            else if (key == '\x03') {
+            } else if (key == '\x03') {
                 break;
             }
 
-            // Only send manual control commands if tracking is not active
             if (!tracking) {
-                // Publish velocity command with timestamp
                 geometry_msgs::msg::TwistStamped msg;
                 msg.header.stamp = node->get_clock()->now();
                 msg.header.frame_id = "base_link";
@@ -282,7 +277,6 @@ int main(int argc, char **argv) {
         std::cerr << ex.what() << std::endl;
     }
 
-    // Cleanup and exit
     terminal.restore();
     rclcpp::shutdown();
     spin_thread.join();
