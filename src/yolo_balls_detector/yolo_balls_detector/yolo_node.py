@@ -89,7 +89,7 @@ class YOLOTargetDetector(Node):
             relative_angle = (centroid_x - center_x) * angle_per_pixel
 
             # Calculate distance using only the area formula
-            raw_distance = float((y2-y1) * (x2-x1)/10000)  # Area of bounding box
+            raw_distance = float(1/((y2-y1) * (x2-x1)/10000))  # Area of bounding box
             physical_distance = ((raw_distance))
             
             # No distance constraints applied
