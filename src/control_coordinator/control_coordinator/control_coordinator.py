@@ -123,33 +123,41 @@ Distance threshold: {self.distance_threshold}m (with {self.hysteresis:.2f}m hyst
     
     def update_control_mode(self):
         """
-        Update the control mode based on person distance:
-        - If distance > threshold, use Nav2
-        - If distance <= threshold, use Teleop PID control
+        Update the control mode based on person detection and distance:
+        - If vest not detected, use Nav2
+        - If vest detected and distance > threshold, use Nav2
+        - If vest detected and distance <= threshold, use Teleop PID control
         """
         with self.lock:
-            # If the vest is not detected, stay with the current mode
-            if not self.vest_detected:
-                return
-            
             # Get current time for cooldown check
             current_time = self.get_clock().now()
             elapsed_sec = (current_time - self.last_mode_switch_time).nanoseconds / 1e9
             
-            # Apply hysteresis to prevent mode flapping
-            if self.current_control_mode == "nav2" and self.person_distance <= (self.distance_threshold - self.hysteresis):
-                # Only switch if cooldown period has passed
-                if elapsed_sec > self.mode_switch_cooldown:
-                    self.current_control_mode = "teleop"
-                    self.last_mode_switch_time = current_time
-                    self.get_logger().info(f"SWITCHING TO TELEOP MODE - Person distance: {self.person_distance:.2f}m")
-            
-            elif self.current_control_mode == "teleop" and self.person_distance > (self.distance_threshold + self.hysteresis):
+            # If the vest is not detected, switch to nav2 mode
+            if not self.vest_detected and self.current_control_mode == "teleop":
                 # Only switch if cooldown period has passed
                 if elapsed_sec > self.mode_switch_cooldown:
                     self.current_control_mode = "nav2"
                     self.last_mode_switch_time = current_time
-                    self.get_logger().info(f"SWITCHING TO NAV2 MODE - Person distance: {self.person_distance:.2f}m")
+                    self.get_logger().info("SWITCHING TO NAV2 MODE - Vest not detected")
+                return
+            
+            # If vest is detected, use distance-based logic
+            if self.vest_detected:
+                # Apply hysteresis to prevent mode flapping
+                if self.current_control_mode == "nav2" and self.person_distance <= (self.distance_threshold - self.hysteresis):
+                    # Only switch if cooldown period has passed
+                    if elapsed_sec > self.mode_switch_cooldown:
+                        self.current_control_mode = "teleop"
+                        self.last_mode_switch_time = current_time
+                        self.get_logger().info(f"SWITCHING TO TELEOP MODE - Person distance: {self.person_distance:.2f}m")
+                
+                elif self.current_control_mode == "teleop" and self.person_distance > (self.distance_threshold + self.hysteresis):
+                    # Only switch if cooldown period has passed
+                    if elapsed_sec > self.mode_switch_cooldown:
+                        self.current_control_mode = "nav2"
+                        self.last_mode_switch_time = current_time
+                        self.get_logger().info(f"SWITCHING TO NAV2 MODE - Person distance: {self.person_distance:.2f}m")
             
             # Publish current control mode
             mode_msg = String()
