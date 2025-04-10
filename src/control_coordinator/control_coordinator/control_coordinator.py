@@ -12,7 +12,7 @@ class ControlCoordinatorNode(Node):
         super().__init__('control_coordinator_node')
         
         # Initialize state variables
-        self.person_distance = 5.0  # Default to a large value
+        self.person_distance = 1.0  # Default to a large value
         self.person_angle = 0.0
         self.vest_detected = False
         self.current_control_mode = "teleop"  # Start with Nav2 control
