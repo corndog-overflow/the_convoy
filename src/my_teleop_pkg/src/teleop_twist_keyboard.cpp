@@ -4,6 +4,7 @@
 #include <map>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float64.hpp>
+#include <std_msgs/msg/string.hpp>
 #include <termios.h>
 #include <thread>
 #include <tuple>
@@ -61,9 +62,9 @@ char getKey() {
 }
 
 // Display current robot status including speed, turn rate, and person tracking info
-void printStatus(float speed, float turn, float angle, float distance) {
+void printStatus(float speed, float turn, float angle, float distance, const std::string& control_mode) {
     std::cout << "\rSpeed: " << speed << " | Turn: " << turn << " | Angle: " << angle << " degrees"
-              << " | Distance: " << distance << "       " << std::flush;
+              << " | Distance: " << distance << " m | Mode: " << control_mode << "       " << std::flush;
 }
 
 // PID controller implementation for smooth motion control
@@ -199,12 +200,15 @@ int main(int argc, char **argv) {
     // Initialize ROS2 node
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("teleop_twist_keyboard");
-    auto pub_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel", 10);
+    
+    // Create publisher for cmd_vel_motor (to be handled by coordinator)
+    auto pub_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel_motor", 10);
 
     // Initialize control variables
     float speed = 1.0, turn = 1.0;
     float person_angle = 0.0, person_distance = -1.0;
     std::atomic<bool> tracking{false};
+    std::string current_control_mode = "unknown";
 
     // Target following distance (changed from 2.0m to 0.3m)
     const float TARGET_DISTANCE = 0.3;
@@ -216,10 +220,18 @@ int main(int argc, char **argv) {
     auto sub_distance = node->create_subscription<std_msgs::msg::Float64>(
         "person_distance", 10,
         [&person_distance](std_msgs::msg::Float64::SharedPtr msg) { person_distance = msg->data; });
+        
+    // Subscribe to control mode topic from coordinator
+    auto sub_control_mode = node->create_subscription<std_msgs::msg::String>(
+        "control_mode", 10,
+        [&current_control_mode](std_msgs::msg::String::SharedPtr msg) { 
+            current_control_mode = msg->data;
+            RCLCPP_INFO(rclcpp::get_logger("teleop_twist_keyboard"), "Control mode changed to: %s", current_control_mode.c_str());
+        });
 
     // Create timer for status updates
     auto timer = node->create_wall_timer(std::chrono::milliseconds(100),
-                                         [&]() { printStatus(speed, turn, person_angle, person_distance); });
+                                         [&]() { printStatus(speed, turn, person_angle, person_distance, current_control_mode); });
 
     // Start ROS2 spin thread
     std::thread spin_thread([&]() { rclcpp::spin(node); });
@@ -254,6 +266,9 @@ int main(int argc, char **argv) {
                     std::thread(trackPerson, pub_twist, std::ref(person_angle), std::ref(person_distance),
                                 TARGET_DISTANCE, node, std::ref(tracking))
                         .detach();
+                    RCLCPP_INFO(node->get_logger(), "Person tracking enabled");
+                } else {
+                    RCLCPP_INFO(node->get_logger(), "Person tracking disabled");
                 }
                 continue;
             }
@@ -262,13 +277,16 @@ int main(int argc, char **argv) {
                 break;
             }
 
-            // Publish velocity command with timestamp
-            geometry_msgs::msg::TwistStamped msg;
-            msg.header.stamp = node->get_clock()->now();
-            msg.header.frame_id = "base_link";
-            msg.twist.linear.x = x * speed;
-            msg.twist.angular.z = th * turn;
-            pub_twist->publish(msg);
+            // Only send manual control commands if tracking is not active
+            if (!tracking) {
+                // Publish velocity command with timestamp
+                geometry_msgs::msg::TwistStamped msg;
+                msg.header.stamp = node->get_clock()->now();
+                msg.header.frame_id = "base_link";
+                msg.twist.linear.x = x * speed;
+                msg.twist.angular.z = th * turn;
+                pub_twist->publish(msg);
+            }
         }
     } catch (const std::exception &ex) {
         std::cerr << ex.what() << std::endl;
