@@ -52,6 +52,22 @@ class ControlCoordinatorNode(Node):
             'control_mode',
             10
         )
+
+        self.cmd_vel_pub = self.create_publisher(TwistStamped, '/cmd_vel', 10)
+
+        self.cmd_vel_benwashere_sub = self.create_subscription(
+            TwistStamped,
+            '/cmd_vel_benwashere',
+            self.cmd_vel_nav_callback,
+            10
+        )
+
+        self.cmd_vel_motor_sub = self.create_subscription(
+            TwistStamped,
+            '/cmd_vel_motor',
+            self.cmd_vel_teleop_callback,
+            10
+        )
         
         # Set up timer for control mode decision making
         self.create_timer(0.1, self.update_control_mode)
@@ -63,6 +79,18 @@ class ControlCoordinatorNode(Node):
         self.get_logger().info(f'Distance threshold for mode switching: {self.distance_threshold}m')
         self.get_logger().info(f'Starting in {self.current_control_mode.upper()} mode')
     
+    def cmd_vel_benwashere_callback(self, msg):
+        """Forward /cmd_vel_benwashere to /cmd_vel if in nav2 mode."""
+        with self.lock:
+            if self.current_control_mode == "nav2":
+                self.cmd_vel_pub.publish(msg)
+
+    def cmd_vel_motor_callback(self, msg):
+        """Forward /cmd_vel_motor to /cmd_vel if in teleop mode."""
+        with self.lock:
+            if self.current_control_mode == "teleop":
+                self.cmd_vel_pub.publish(msg)
+
     def distance_callback(self, msg):
         """Callback for person_distance topic."""
         with self.lock:
