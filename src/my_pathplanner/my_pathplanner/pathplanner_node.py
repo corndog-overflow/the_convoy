@@ -24,7 +24,7 @@ class PathPlannerNode(Node):
         self.last_visible_time = None
         
         # For corner extending
-        self.INVISIBLE_TIMEOUT = 2.0 
+        self.INVISIBLE_TIMEOUT = 4.0 
         self.lastx = 0.0
         self.lasty = 0.0
         self.locked = False
