@@ -125,7 +125,7 @@ class YOLOTargetDetector(Node):
             relative_angle = (centroid_x - center_x) * angle_per_pixel
 
             # Raw height value from bounding box
-            raw_distance = float(bbox_height)
+            raw_distance = float((y2-y1) * (x2-x1))
             
             # Distance calculation based on truncation state
             if is_truncated:
