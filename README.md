@@ -82,6 +82,14 @@ Quick sync and build git to workspace:
 rsync -av --delete ~/Documents/GitHub/the_convoy/src/ ~/ros2_ws/src/
 colcon build
 ```
+handle all 3 steps by running bash script initNav.sh:
+```bash
+./initNav.sh 
+```
+or (for Robot 2)
+```bash
+./initNav.sh 1
+```
 Vest Detector Node
 ```bash
 ros2 run yolo_vest_detector yolo_vest_detector
