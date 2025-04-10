@@ -98,7 +98,7 @@ class YOLOTargetDetector(Node):
             for box in result.boxes:
                 cls = int(box.cls[0].item())  
                 confidence = box.conf[0].item()
-                if cls == self.target_class_id and confidence > 0.8:
+                if cls == self.target_class_id and confidence > 0.85:
                     vest_detected = True  # Set detection flag to True
                     x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())  
                     area = (x2 - x1) * (y2 - y1)
