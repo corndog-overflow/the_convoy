@@ -5,6 +5,8 @@ from rclpy.node import Node
 from std_msgs.msg import Float64, Bool
 from geometry_msgs.msg import PoseStamped, Quaternion
 from turtlebot4_navigation.turtlebot4_navigator import TurtleBot4Navigator
+from rclpy.time import Time
+from rclpy.duration import Duration
 
 class PathPlannerNode(Node):
     def __init__(self):
@@ -23,6 +25,12 @@ class PathPlannerNode(Node):
         self.last_valid_distance = 0.0
         self.person_visible = False
         self.last_visible_time = None
+        
+        # Add variables to store the last goal pose
+        self.last_goal_x = 0.0
+        self.last_goal_y = 0.0
+        self.using_extended_goal = False
+        self.visibility_timeout_seconds = 2.0  # Time threshold to activate extended goal
         
         # Create navigator
         self.navigator = TurtleBot4Navigator()
@@ -76,7 +84,8 @@ class PathPlannerNode(Node):
         self.get_logger().info(f"{status_distance} distance data: {self.person_distance:.2f} meters")
         self.get_logger().info(f"{status_detection} vest detection status")
         visibility = "VISIBLE" if self.person_visible else "NOT VISIBLE (using last valid position)"
-        self.get_logger().info(f"Person status: {visibility}")
+        extended_goal = "YES" if self.using_extended_goal else "NO"
+        self.get_logger().info(f"Person status: {visibility}, Using extended goal: {extended_goal}")
         self.get_logger().info('=' * 50)
     
     def angle_callback(self, msg):
@@ -115,6 +124,8 @@ class PathPlannerNode(Node):
             self.last_valid_angle = self.person_angle
             self.last_valid_distance = self.person_distance
             self.last_visible_time = self.get_clock().now()
+            # Reset extended goal flag when person becomes visible again
+            self.using_extended_goal = False
         
         # Log change in visibility status
         if previous_visibility != self.person_visible:
@@ -137,6 +148,8 @@ class PathPlannerNode(Node):
                 self.last_valid_angle = self.person_angle
                 self.last_valid_distance = self.person_distance
                 self.last_visible_time = self.get_clock().now()
+                # Reset extended goal flag when person becomes visible again
+                self.using_extended_goal = False
             
             # Update visibility status
             if self.person_visible != new_visibility:
@@ -175,24 +188,61 @@ class PathPlannerNode(Node):
         
         # Start the first navigation
         self.navigate_to_person()
+    
+    def check_visibility_timeout(self):
+        """Check if the person has been not visible for longer than the timeout period."""
+        if not self.person_visible and self.last_visible_time is not None:
+            current_time = self.get_clock().now()
+            elapsed_time = (current_time - self.last_visible_time).nanoseconds / 1e9  # Convert to seconds
+            
+            if elapsed_time >= self.visibility_timeout_seconds and not self.using_extended_goal:
+                self.using_extended_goal = True
+                self.get_logger().warn(f"VISIBILITY TIMEOUT ({self.visibility_timeout_seconds}s) REACHED! Switching to extended goal.")
+                return True
+        return False
         
     def navigate_to_person(self):
         """Navigate to the person's current position with latest sensor data."""
-        # When person is not visible, don't send new goals
+        # Check if the visibility timeout has been reached
+        self.check_visibility_timeout()
+        
+        # Initialize the goal coordinates
+        x = 0.0
+        y = 0.0
+        
+        # When person is not visible, use last valid position
         if not self.person_visible:
             self.get_logger().info('=' * 50)
             self.get_logger().info("NAVIGATION STATUS: VEST NOT DETECTED")
-            self.get_logger().info("Not sending new goal pose, continuing with previous goal")
-            self.get_logger().info('=' * 50)
-            return  # Exit without sending a new goal
+            
+            # If we're using extended goal (visibility timeout reached)
+            if self.using_extended_goal:
+                # Use the last goal pose and modify the y value
+                x = self.last_valid_distance
+                
+                # Calculate y for the extended goal
+                base_y = math.tan(math.radians(self.last_valid_angle)) * -x
+                # Add +1 if y is positive, -1 if y is negative
+                y = base_y + (1.0 if base_y >= 0.0 else -1.0)
+                
+                self.get_logger().info("USING EXTENDED GOAL: Adding offset to last known position")
+                self.get_logger().info(f"Base Y: {base_y:.2f}, Modified Y: {y:.2f}")
+            else:
+                # Just use the last valid position without modification
+                self.get_logger().info("Continuing with last known position")
+                return  # Exit without sending a new goal
+        else:
+            # Person is visible, use current data
+            angle_to_use = self.person_angle
+            distance_to_use = self.person_distance
+            
+            # Calculate new x and y coordinates based on sensor data
+            x = distance_to_use
+            y = math.tan(math.radians(angle_to_use)) * -x
         
-        # Only send new goals when person is visible
-        angle_to_use = self.person_angle
-        distance_to_use = self.person_distance
-        
-        # Calculate new x and y coordinates based on sensor data
-        x = distance_to_use
-        y = math.tan(math.radians(angle_to_use)) * -x
+        # Store the goal for future reference
+        self.last_goal_x = x
+        self.last_goal_y = y
         
         print("X VALUE:**************************************************************")
         print(x)
@@ -200,9 +250,14 @@ class PathPlannerNode(Node):
         print(y)
 
         self.get_logger().info('=' * 50)
-        self.get_logger().info("NAVIGATION CALCULATION (CURRENT POSITION):")
-        self.get_logger().info(f"Input angle: {angle_to_use:.2f}° ({math.radians(angle_to_use):.2f} radians)")
-        self.get_logger().info(f"Input distance: {distance_to_use:.2f} meters")
+        self.get_logger().info("NAVIGATION CALCULATION:")
+        if self.person_visible:
+            self.get_logger().info(f"Input angle: {self.person_angle:.2f}° ({math.radians(self.person_angle):.2f} radians)")
+            self.get_logger().info(f"Input distance: {self.person_distance:.2f} meters")
+        elif self.using_extended_goal:
+            self.get_logger().info(f"Using EXTENDED GOAL based on last valid position plus y-offset")
+            self.get_logger().info(f"Last valid angle: {self.last_valid_angle:.2f}°")
+            self.get_logger().info(f"Last valid distance: {self.last_valid_distance:.2f} meters")
         self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
         self.get_logger().info('=' * 50)
         
