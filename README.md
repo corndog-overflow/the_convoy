@@ -94,7 +94,7 @@ Vest Detector Node
 ```bash
 ros2 run yolo_vest_detector yolo_vest_detector
 ```
-Vest Detector Node
+Control Coordinator Node
 ```bash
 ros2 run control_coordinator control_coordinator
 ```
