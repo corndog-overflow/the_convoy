@@ -16,7 +16,7 @@ class ControlCoordinatorNode(Node):
         self.person_angle = 0.0
         self.vest_detected = False
         self.current_control_mode = "teleop"  # Start with Nav2 control
-        self.distance_threshold = 3.0  # Threshold to switch between nav2 and teleop
+        self.distance_threshold = 4.0  # Threshold to switch between nav2 and teleop
         self.hysteresis = 0.2  # To prevent rapid switching at the threshold
         self.last_mode_switch_time = self.get_clock().now()
         self.mode_switch_cooldown = 3.0  # Seconds to wait before allowing another mode switch
