@@ -110,9 +110,9 @@ class PathPlannerNode(Node):
         if not self.person_visible and invisible_timeout_reached and not self.locked:
             x = self.lastx
             if self.lasty >= 0:
-                  y = self.lasty + 1.5  # Add 1 if y is positive or zero
+                  y = self.lasty + 1.0  # Add 1 if y is positive or zero
             else:
-                  y = self.lasty - 1.5 # Subtract 1 if y is negative
+                  y = self.lasty - 1.0 # Subtract 1 if y is negative
 
             self.get_logger().info(f'USING EXTENDED GOAL: Last goal was x={self.lastx:.2f}m, y={self.lasty:.2f}m, new extended goal is x={x:.2f}m, y={y:.2f}m')
 
