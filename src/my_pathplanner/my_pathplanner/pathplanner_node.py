@@ -24,11 +24,6 @@ class PathPlannerNode(Node):
         self.person_visible = False
         self.last_visible_time = None
         
-        # Add variables for handling person loss
-        self.last_goal_position = None
-        self.invisible_goal_sent = False
-        self.INVISIBLE_TIMEOUT = 2.0  # seconds
-        
         # Create navigator
         self.navigator = TurtleBot4Navigator()
         print("TESTING2")
@@ -120,18 +115,13 @@ class PathPlannerNode(Node):
             self.last_valid_angle = self.person_angle
             self.last_valid_distance = self.person_distance
             self.last_visible_time = self.get_clock().now()
-            # Reset goal modification tracking when person becomes visible again
-            self.invisible_goal_sent = False
-        else:
-            # Person just became invisible
-            self.last_visible_time = self.get_clock().now()
         
         # Log change in visibility status
         if previous_visibility != self.person_visible:
             if self.person_visible:
                 self.get_logger().info("PERSON DETECTED! Using current position.")
             else:
-                self.get_logger().warn("PERSON LOST! Starting invisible timer.")
+                self.get_logger().warn("PERSON LOST! Continuing to last known position.")
                 
     def update_visibility_status(self):
         """Legacy method to update visibility status based on distance value.
@@ -147,19 +137,13 @@ class PathPlannerNode(Node):
                 self.last_valid_angle = self.person_angle
                 self.last_valid_distance = self.person_distance
                 self.last_visible_time = self.get_clock().now()
-                # Reset goal modification tracking when person becomes visible again
-                self.invisible_goal_sent = False
-            else:
-                # Person just became invisible
-                if self.person_visible:  # Only update time when transitioning to invisible
-                    self.last_visible_time = self.get_clock().now()
             
             # Update visibility status
             if self.person_visible != new_visibility:
                 if new_visibility:
                     self.get_logger().info("PERSON DETECTED! Using current position.")
                 else:
-                    self.get_logger().warn("PERSON LOST! Starting invisible timer.")
+                    self.get_logger().warn("PERSON LOST! Continuing to last known position.")
             
             self.person_visible = new_visibility
     
@@ -194,77 +178,34 @@ class PathPlannerNode(Node):
         
     def navigate_to_person(self):
         """Navigate to the person's current position with latest sensor data."""
-        current_time = self.get_clock().now()
+        # When person is not visible, don't send new goals
+        if not self.person_visible:
+            self.get_logger().info('=' * 50)
+            self.get_logger().info("NAVIGATION STATUS: VEST NOT DETECTED")
+            self.get_logger().info("Not sending new goal pose, continuing with previous goal")
+            self.get_logger().info('=' * 50)
+            return  # Exit without sending a new goal
         
-        # Check if the person has been invisible for more than INVISIBLE_TIMEOUT seconds
-        person_invisible_timeout = False
-        if not self.person_visible and self.last_visible_time is not None:
-            elapsed_time = (current_time - self.last_visible_time).nanoseconds / 1e9  # Convert to seconds
-            if elapsed_time >= self.INVISIBLE_TIMEOUT:
-                person_invisible_timeout = True
+        # Only send new goals when person is visible
+        angle_to_use = self.person_angle
+        distance_to_use = self.person_distance
         
-        # Case 1: Person is visible - normal operation
-        if self.person_visible:
-            # Calculate new goal based on current sensor data
-            angle_to_use = self.person_angle
-            distance_to_use = self.person_distance
-            
-            # Calculate new x and y coordinates based on sensor data
-            x = distance_to_use
-            y = math.tan(math.radians(angle_to_use)) * -x
-            
-            # Save this as the last goal position
-            self.last_goal_position = (x, y)
-            
-            self.get_logger().info('=' * 50)
-            self.get_logger().info("NAVIGATION CALCULATION (CURRENT POSITION):")
-            self.get_logger().info(f"Input angle: {angle_to_use:.2f}° ({math.radians(angle_to_use):.2f} radians)")
-            self.get_logger().info(f"Input distance: {distance_to_use:.2f} meters")
-            self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
-            self.get_logger().info('=' * 50)
-            
-            # Create and send goal
-            self.send_goal_to_navigator(x, y)
+        # Calculate new x and y coordinates based on sensor data
+        x = distance_to_use
+        y = math.tan(math.radians(angle_to_use)) * -x
         
-        # Case 2: Person just became invisible for more than 2 seconds and we haven't sent the modified goal yet
-        elif person_invisible_timeout and not self.invisible_goal_sent and self.last_goal_position is not None:
-            x, y = self.last_goal_position
-            
-            # Modify y coordinate: +1 if y is positive, -1 if y is negative
-            if y >= 0:
-                modified_y = y + 1.0
-            else:
-                modified_y = y - 1.0
-            
-            self.get_logger().info('=' * 50)
-            self.get_logger().info("PERSON INVISIBLE FOR 2+ SECONDS - SENDING MODIFIED GOAL")
-            self.get_logger().info(f"Previous goal: x={x:.2f}m, y={y:.2f}m")
-            self.get_logger().info(f"Modified goal: x={x:.2f}m, y={modified_y:.2f}m")
-            self.get_logger().info('=' * 50)
-            
-            # Send the modified goal
-            self.send_goal_to_navigator(x, modified_y)
-            
-            # Mark that we've sent the invisible goal
-            self.invisible_goal_sent = True
-        
-        # Case 3: Person still invisible and we've already sent the modified goal
-        elif not self.person_visible and self.invisible_goal_sent:
-            self.get_logger().info('=' * 50)
-            self.get_logger().info("NAVIGATION STATUS: PERSON STILL NOT VISIBLE")
-            self.get_logger().info("Already sent modified goal, waiting for person to become visible again")
-            self.get_logger().info('=' * 50)
-        
-        # Case 4: Person just became invisible but timeout not reached
-        elif not self.person_visible and not person_invisible_timeout:
-            elapsed_time = (current_time - self.last_visible_time).nanoseconds / 1e9 if self.last_visible_time else 0
-            self.get_logger().info('=' * 50)
-            self.get_logger().info(f"NAVIGATION STATUS: PERSON INVISIBLE FOR {elapsed_time:.1f}s (waiting for {self.INVISIBLE_TIMEOUT}s)")
-            self.get_logger().info("Continuing with previous goal until timeout")
-            self.get_logger().info('=' * 50)
+        print("X VALUE:**************************************************************")
+        print(x)
+        print("Y VALUE:**************************************************************")
+        print(y)
 
-    def send_goal_to_navigator(self, x, y):
-        """Helper method to send a goal to the navigator."""
+        self.get_logger().info('=' * 50)
+        self.get_logger().info("NAVIGATION CALCULATION (CURRENT POSITION):")
+        self.get_logger().info(f"Input angle: {angle_to_use:.2f}° ({math.radians(angle_to_use):.2f} radians)")
+        self.get_logger().info(f"Input distance: {distance_to_use:.2f} meters")
+        self.get_logger().info(f"Target coordinates: x={x:.2f}m, y={y:.2f}m (in base_link frame)")
+        self.get_logger().info('=' * 50)
+        
         # Create a goal pose and set position
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'base_link'
@@ -278,8 +219,8 @@ class PathPlannerNode(Node):
         # Set orientation to identity quaternion (no rotation)
         goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
         
-        # Send the goal pose
-        self.get_logger().info(f'SENDING GOAL: x={x:.2f}m, y={y:.2f}m')
+        # Send the goal pose - we don't care about previous goal status
+        self.get_logger().info(f'SENDING NEW GOAL: x={x:.2f}m, y={y:.2f}m')
         self.navigator.goToPose(goal_pose)
 
 def main(args=None):
