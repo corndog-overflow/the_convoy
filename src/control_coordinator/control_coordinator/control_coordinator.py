@@ -58,14 +58,14 @@ class ControlCoordinatorNode(Node):
         self.cmd_vel_benwashere_sub = self.create_subscription(
             TwistStamped,
             '/cmd_vel_benwashere',
-            self.cmd_vel_nav_callback,
+            self.cmd_vel_benwashere_callback,
             10
         )
 
         self.cmd_vel_motor_sub = self.create_subscription(
             TwistStamped,
             '/cmd_vel_motor',
-            self.cmd_vel_teleop_callback,
+            self.cmd_vel_motor_callback,
             10
         )
         
