@@ -110,9 +110,9 @@ class PathPlannerNode(Node):
         if not self.person_visible and invisible_timeout_reached and not self.locked:
             x = self.lastx
             if self.lasty >= 0:
-                  y = self.lasty + 1.0  # Add 1 if y is positive or zero
+                  y = self.lasty + 0.5  # Add 1 if y is positive or zero
             else:
-                  y = self.lasty - 1.0  # Subtract 1 if y is negative
+                  y = self.lasty - 0.5 # Subtract 1 if y is negative
 
             self.get_logger().info(f'USING EXTENDED GOAL: Last goal was x={self.lastx:.2f}m, y={self.lasty:.2f}m, new extended goal is x={x:.2f}m, y={y:.2f}m')
 
@@ -122,7 +122,7 @@ class PathPlannerNode(Node):
             goal_pose.pose.position.x = x
             goal_pose.pose.position.y = y
             goal_pose.pose.position.z = 0.0
-            goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+            # goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
             
             self.navigator.goToPose(goal_pose)
             self.locked = True
@@ -139,8 +139,10 @@ class PathPlannerNode(Node):
         x = distance_to_use
         y = math.tan(math.radians(angle_to_use)) * -x
         
-        self.lastx = x
-        self.lasty = y
+        
+        if x != 0.0:
+            self.lastx = x
+            self.lasty = y
 
         goal_pose = PoseStamped()
         goal_pose.header.frame_id = 'base_link'
@@ -148,7 +150,7 @@ class PathPlannerNode(Node):
         goal_pose.pose.position.x = x
         goal_pose.pose.position.y = y
         goal_pose.pose.position.z = 0.0
-        goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+        # goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
         
         self.navigator.goToPose(goal_pose)
 
