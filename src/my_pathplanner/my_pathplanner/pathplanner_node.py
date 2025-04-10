@@ -24,6 +24,12 @@ class PathPlannerNode(Node):
         self.person_visible = False
         self.last_visible_time = None
         
+        #for cprner extending
+        self.INVISIBLE_TIMEOUT = 2.0 
+        self.lastx = 0.0
+        self.lasty = 0.0
+        self.locked = False
+        
         # Create navigator
         self.navigator = TurtleBot4Navigator()
         print("TESTING2")
@@ -176,16 +182,56 @@ class PathPlannerNode(Node):
         # Start the first navigation
         self.navigate_to_person()
         
+   
     def navigate_to_person(self):
         """Navigate to the person's current position with latest sensor data."""
+
+        current_time = self.get_clock().now()
+
+        invisible_timeout_reached = False
+        if not self.person_visible and self.last_visible_time is not None:
+             elapsed_time = (current_time - self.last_visible_time).nanoseconds / 1e9  # Convert to seconds
+             invisible_timeout_reached = elapsed_time >= self.INVISIBLE_TIMEOUT
+
+
+
         # When person is not visible, don't send new goals
-        if not self.person_visible:
+        if not self.person_visible and invisible_timeout_reached and not self.locked:
             self.get_logger().info('=' * 50)
             self.get_logger().info("NAVIGATION STATUS: VEST NOT DETECTED")
             self.get_logger().info("Not sending new goal pose, continuing with previous goal")
             self.get_logger().info('=' * 50)
+
+            x = self.lastx
+            if self.lasty >= 0:
+                  y = self.lasty + 3.0  # Add 1 if y is positive or zero
+            else:
+                  y = self.lasty - 3.0  # Subtract 1 if y is negative
+
+
+
+            goal_pose = PoseStamped()
+            goal_pose.header.frame_id = 'base_link'
+            goal_pose.header.stamp = self.get_clock().now().to_msg()
+        
+            # Set the position
+            goal_pose.pose.position.x = x
+            goal_pose.pose.position.y = y
+            goal_pose.pose.position.z = 0.0
+        
+            # Set orientation to identity quaternion (no rotation)
+            goal_pose.pose.orientation = Quaternion(x=0.0, y=0.0, z=0.0, w=1.0)
+        
+            # Send the goal pose - we don't care about previous goal status
+            self.get_logger().info(f'SENDING NEW GOAL: x={x:.2f}m, y={y:.2f}m')
+            self.navigator.goToPose(goal_pose)
+            self.locked = True
             return  # Exit without sending a new goal
         
+        if not self.person_visible and self.locked:
+            return
+        
+        self.locked = False
         # Only send new goals when person is visible
         angle_to_use = self.person_angle
         distance_to_use = self.person_distance
@@ -194,6 +240,11 @@ class PathPlannerNode(Node):
         x = distance_to_use
         y = math.tan(math.radians(angle_to_use)) * -x
         
+
+        self.lastx = x
+        self.lasty = y
+
+
         print("X VALUE:**************************************************************")
         print(x)
         print("Y VALUE:**************************************************************")
