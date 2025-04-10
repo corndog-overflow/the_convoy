@@ -135,7 +135,7 @@ void trackPerson(
     const double APPROACH_SPEED_LIMIT = 0.4;
     const double ANGLE_DEADZONE = 3.0;
     const double DISTANCE_DEADZONE = 0.02;
-    const double START_MOVING_DISTANCE = 3.0;
+    const double START_MOVING_DISTANCE = 3.5;
 
     while (rclcpp::ok() && tracking) {
         auto now = std::chrono::steady_clock::now();
