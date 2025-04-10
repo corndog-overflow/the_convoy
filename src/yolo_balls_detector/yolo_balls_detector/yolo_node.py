@@ -34,7 +34,7 @@ class YOLOTargetDetector(Node):
         self.smoothed_angle = None
         self.smoothed_distance = None
         
-        # Distance value constraints
+        # # Distance value constraints
         # self.min_distance_value = 0.1  # Minimum distance value in meters
         # self.max_distance_value = 5.0  # Maximum distance value in meters
 
@@ -92,8 +92,7 @@ class YOLOTargetDetector(Node):
             raw_distance = float((y2-y1) * (x2-x1))  # Area of bounding box
             physical_distance = ((raw_distance-98.514)/(-3.0699))/3.28084
             
-            # Constrain distance to valid range
-            physical_distance = max(min(physical_distance, self.max_distance_value), self.min_distance_value)
+            # No distance constraints applied
 
             # Apply smoothing
             self.smoothed_angle = self.smooth_value(relative_angle, self.smoothed_angle)
