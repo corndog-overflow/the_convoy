@@ -190,7 +190,9 @@ class PathPlannerNode(Node):
         self.navigate_to_person()
     
     def check_visibility_timeout(self):
-        """Check if the person has been not visible for longer than the timeout period."""
+        """Check if the person has been not visible for longer than the timeout period.
+        Returns True if the timeout has just been reached (transition from normal to extended goal),
+        False otherwise."""
         if not self.person_visible and self.last_visible_time is not None:
             current_time = self.get_clock().now()
             elapsed_time = (current_time - self.last_visible_time).nanoseconds / 1e9  # Convert to seconds
@@ -198,26 +200,26 @@ class PathPlannerNode(Node):
             if elapsed_time >= self.visibility_timeout_seconds and not self.using_extended_goal:
                 self.using_extended_goal = True
                 self.get_logger().warn(f"VISIBILITY TIMEOUT ({self.visibility_timeout_seconds}s) REACHED! Switching to extended goal.")
-                return True
-        return False
+                return True  # Indicates that the timeout was just reached
+        return False  # Timeout hasn't been reached or we're already using extended goal
         
     def navigate_to_person(self):
         """Navigate to the person's current position with latest sensor data."""
         # Check if the visibility timeout has been reached
-        self.check_visibility_timeout()
+        has_timeout_just_occurred = self.check_visibility_timeout()
         
         # Initialize the goal coordinates
         x = 0.0
         y = 0.0
         
-        # When person is not visible, use last valid position
+        # When person is not visible, handle differently based on timeout
         if not self.person_visible:
             self.get_logger().info('=' * 50)
             self.get_logger().info("NAVIGATION STATUS: VEST NOT DETECTED")
             
-            # If we're using extended goal (visibility timeout reached)
-            if self.using_extended_goal:
-                # Use the last goal pose and modify the y value
+            # If timeout just occurred, calculate the extended goal once
+            if has_timeout_just_occurred:
+                # Use the last valid position as base
                 x = self.last_valid_distance
                 
                 # Calculate y for the extended goal
@@ -225,8 +227,19 @@ class PathPlannerNode(Node):
                 # Add +1 if y is positive, -1 if y is negative
                 y = base_y + (1.0 if base_y >= 0.0 else -1.0)
                 
-                self.get_logger().info("USING EXTENDED GOAL: Adding offset to last known position")
+                # Store this extended goal for future use
+                self.last_goal_x = x
+                self.last_goal_y = y
+                
+                self.get_logger().info("SETTING EXTENDED GOAL: Adding offset to last known position")
                 self.get_logger().info(f"Base Y: {base_y:.2f}, Modified Y: {y:.2f}")
+            
+            # If already using extended goal but timeout didn't just occur,
+            # use the stored extended goal without recalculating
+            elif self.using_extended_goal:
+                x = self.last_goal_x
+                y = self.last_goal_y
+                self.get_logger().info("USING PREVIOUSLY SET EXTENDED GOAL")
             else:
                 # Just use the last valid position without modification
                 self.get_logger().info("Continuing with last known position")
@@ -239,10 +252,10 @@ class PathPlannerNode(Node):
             # Calculate new x and y coordinates based on sensor data
             x = distance_to_use
             y = math.tan(math.radians(angle_to_use)) * -x
-        
-        # Store the goal for future reference
-        self.last_goal_x = x
-        self.last_goal_y = y
+            
+            # Store the goal for future reference (only when person is visible)
+            self.last_goal_x = x
+            self.last_goal_y = y
         
         print("X VALUE:**************************************************************")
         print(x)
