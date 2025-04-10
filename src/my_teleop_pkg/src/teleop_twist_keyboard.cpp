@@ -118,15 +118,15 @@ class PIDController {
 };
 
 // Function to handle person tracking behavior
-void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub, float &target_angle,
-                 float &target_distance, float target_distance, rclcpp::Node::SharedPtr node,
+void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr pub, float &person_angle,
+                 float &person_distance, float target_distance, rclcpp::Node::SharedPtr node,
                  std::atomic<bool> &tracking) {
     // Adjusted PID parameters for closer following
     PIDController angular_pid(0.05, 0.001, 0.01, -0.5, 0.5);
     PIDController linear_pid(0.3, 0.0, 0.1, -0.3, 0.3); // Reduced gains for smoother control
     geometry_msgs::msg::TwistStamped cmd_msg;
 
-    double prev_distance = target_distance;
+    double prev_distance = person_distance;
     const double APPROACH_SPEED_LIMIT = 0.2; // Reduced speed limit for safety
 
     // Define deadzones to reduce wiggling
@@ -135,10 +135,10 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr 
 
     while (rclcpp::ok() && tracking) {
         // Calculate errors for PID controllers
-        double angular_error = target_angle;
-        double linear_error = target_distance - target_distance;
-        double approach_velocity = (prev_distance - target_distance) / 0.05;
-        prev_distance = target_distance;
+        double angular_error = person_angle;
+        double linear_error = person_distance - target_distance;
+        double approach_velocity = (prev_distance - person_distance) / 0.05;
+        prev_distance = person_distance;
 
         // Compute angular control command with deadzone
         if (std::abs(angular_error) < ANGLE_DEADZONE) {
@@ -183,7 +183,7 @@ void trackPerson(rclcpp::Publisher<geometry_msgs::msg::TwistStamped>::SharedPtr 
         pub->publish(cmd_msg);
         RCLCPP_INFO(node->get_logger(),
                     "Tracking... Angle: %.2f deg (cmd: %.2f), Distance: %.2f m (cmd: %.2f), Approach Speed: %.2f",
-                    target_angle, cmd_msg.twist.angular.z, target_distance, cmd_msg.twist.linear.x, approach_velocity);
+                    person_angle, cmd_msg.twist.angular.z, person_distance, cmd_msg.twist.linear.x, approach_velocity);
         std::this_thread::sleep_for(std::chrono::milliseconds(50));
     }
 
@@ -203,7 +203,7 @@ int main(int argc, char **argv) {
 
     // Initialize control variables
     float speed = 1.0, turn = 1.0;
-    float target_angle = 0.0, target_distance = -1.0;
+    float person_angle = 0.0, person_distance = -1.0;
     std::atomic<bool> tracking{false};
 
     // Target following distance (changed from 2.0m to 0.3m)
@@ -211,15 +211,15 @@ int main(int argc, char **argv) {
 
     // Subscribe to person tracking topics
     auto sub_angle = node->create_subscription<std_msgs::msg::Float64>(
-        "target_angle", 10, [&target_angle](std_msgs::msg::Float64::SharedPtr msg) { target_angle = msg->data; });
+        "person_angle", 10, [&person_angle](std_msgs::msg::Float64::SharedPtr msg) { person_angle = msg->data; });
 
     auto sub_distance = node->create_subscription<std_msgs::msg::Float64>(
-        "target_distance", 10,
-        [&target_distance](std_msgs::msg::Float64::SharedPtr msg) { target_distance = msg->data; });
+        "person_distance", 10,
+        [&person_distance](std_msgs::msg::Float64::SharedPtr msg) { person_distance = msg->data; });
 
     // Create timer for status updates
     auto timer = node->create_wall_timer(std::chrono::milliseconds(100),
-                                         [&]() { printStatus(speed, turn, target_angle, target_distance); });
+                                         [&]() { printStatus(speed, turn, person_angle, person_distance); });
 
     // Start ROS2 spin thread
     std::thread spin_thread([&]() { rclcpp::spin(node); });
@@ -251,7 +251,7 @@ int main(int argc, char **argv) {
             else if (key == 'P' || key == 'p') {
                 tracking = !tracking;
                 if (tracking) {
-                    std::thread(trackPerson, pub_twist, std::ref(target_angle), std::ref(target_distance),
+                    std::thread(trackPerson, pub_twist, std::ref(person_angle), std::ref(person_distance),
                                 TARGET_DISTANCE, node, std::ref(tracking))
                         .detach();
                 }
