@@ -25,8 +25,8 @@ class YOLOTargetDetector(Node):
         self.get_logger().info("YOLO Target Detector Node Started")
 
         # Publishers
-        self.angle_pub = self.create_publisher(Float64, "person_angle", 10)
-        self.distance_pub = self.create_publisher(Float64, "person_distance", 10)
+        self.angle_pub = self.create_publisher(Float64, "target_angle", 10)
+        self.distance_pub = self.create_publisher(Float64, "target_distance", 10)
         # New publisher for detection status
         self.detection_pub = self.create_publisher(Bool, "vest_detected", 10)
 
