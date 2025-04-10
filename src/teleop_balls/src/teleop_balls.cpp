@@ -4,7 +4,6 @@
 #include <map>
 #include <rclcpp/rclcpp.hpp>
 #include <std_msgs/msg/float64.hpp>
-#include <std_msgs/msg/string.hpp>
 #include <termios.h>
 #include <thread>
 #include <tuple>
@@ -62,9 +61,9 @@ char getKey() {
 }
 
 // Display current robot status including speed, turn rate, and person tracking info
-void printStatus(float speed, float turn, float angle, float distance, const std::string& control_mode) {
+void printStatus(float speed, float turn, float angle, float distance) {
     std::cout << "\rSpeed: " << speed << " | Turn: " << turn << " | Angle: " << angle << " degrees"
-              << " | Distance: " << distance << " m | Mode: " << control_mode << "       " << std::flush;
+              << " | Distance: " << distance << " m" << "       " << std::flush;
 }
 
 // PID controller implementation for smooth motion control
@@ -201,16 +200,15 @@ int main(int argc, char **argv) {
     rclcpp::init(argc, argv);
     auto node = rclcpp::Node::make_shared("teleop_twist_keyboard");
     
-    // Create publisher for cmd_vel_motor (to be handled by coordinator)
-    auto pub_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel_motor", 10);
+    // Create publisher for cmd_vel
+    auto pub_twist = node->create_publisher<geometry_msgs::msg::TwistStamped>("cmd_vel", 10);
 
     // Initialize control variables
     float speed = 1.0, turn = 1.0;
     float person_angle = 0.0, person_distance = -1.0;
     std::atomic<bool> tracking{false};
-    std::string current_control_mode = "unknown";
 
-    // Target following distance (changed from 2.0m to 0.3m)
+    // Target following distance
     const float TARGET_DISTANCE = 0.3;
 
     // Subscribe to person tracking topics
@@ -220,18 +218,10 @@ int main(int argc, char **argv) {
     auto sub_distance = node->create_subscription<std_msgs::msg::Float64>(
         "person_distance", 10,
         [&person_distance](std_msgs::msg::Float64::SharedPtr msg) { person_distance = msg->data; });
-        
-    // Subscribe to control mode topic from coordinator
-    auto sub_control_mode = node->create_subscription<std_msgs::msg::String>(
-        "control_mode", 10,
-        [&current_control_mode](std_msgs::msg::String::SharedPtr msg) { 
-            current_control_mode = msg->data;
-            RCLCPP_INFO(rclcpp::get_logger("teleop_twist_keyboard"), "Control mode changed to: %s", current_control_mode.c_str());
-        });
 
     // Create timer for status updates
     auto timer = node->create_wall_timer(std::chrono::milliseconds(100),
-                                         [&]() { printStatus(speed, turn, person_angle, person_distance, current_control_mode); });
+                                         [&]() { printStatus(speed, turn, person_angle, person_distance); });
 
     // Start ROS2 spin thread
     std::thread spin_thread([&]() { rclcpp::spin(node); });
