@@ -215,7 +215,7 @@ int main(int argc, char **argv) {
     std::atomic<std::chrono::steady_clock::time_point> last_detection_time = std::chrono::steady_clock::now();
     std::atomic<bool> tracking{false};
 
-    const float TARGET_DISTANCE = 0.3;
+    const float TARGET_DISTANCE = 4;
 
     auto sub_angle = node->create_subscription<std_msgs::msg::Float64>(
         "person_angle", 10,
